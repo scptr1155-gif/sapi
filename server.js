@@ -4,225 +4,205 @@ const crypto = require("crypto");
 require("dotenv").config();
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
 app.disable("x-powered-by");
-app.use(express.json({limit:"10kb"}));
-
-const PORT = process.env.PORT || 3000;
+app.use(express.json());
 
 const OWNER = "scptr1155-gif";
 const REPO = "fly-noclip-scpstudio";
 const PATH = "code82437";
 const BRANCH = "main";
 
-const API =
- `https://api.github.com/repos/${OWNER}/${REPO}/contents/${PATH}`;
+const API = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${PATH}`;
 
 const challenges = new Map();
 
-function githubHeaders(){
- return {
-  "Authorization": `Bearer ${process.env.GITHUB_TOKEN}`,
-  "Accept": "application/vnd.github+json",
-  "X-GitHub-Api-Version": "2022-11-28",
-  "User-Agent": "SCP-Key-Generator"
- };
+function headers() {
+    return {
+        Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "SCP-Key-Generator"
+    };
 }
 
-async function githubRequest(url, options = {}){
- const response = await fetch(url,{
-  ...options,
-  headers:{
-   ...githubHeaders(),
-   ...(options.headers || {})
-  }
- });
+// API TEST
+app.get("/api/test", (req, res) => {
+    res.json({
+        success: true,
+        message: "SCP API çalışıyor!"
+    });
+});
 
- const raw = await response.text();
- let data;
+// Geri sayım başlat
+app.post("/api/start", (req, res) => {
+    const challenge = crypto.randomBytes(32).toString("hex");
 
- try {
-  data = JSON.parse(raw);
- } catch {
-  throw new Error(
-   `GitHub geçersiz cevap verdi (HTTP ${response.status}): ${raw.slice(0,150)}`
-  );
- }
+    challenges.set(challenge, {
+        createdAt: Date.now(),
+        used: false
+    });
 
- if(!response.ok){
-  throw new Error(
-   `GitHub API ${response.status}: ${data.message || "İşlem başarısız"}`
-  );
- }
+    res.json({
+        success: true,
+        challenge
+    });
+});
 
- return data;
+// GitHub dosyasına key ekle
+async function saveKey(line) {
+    for (let i = 0; i < 5; i++) {
+        const response = await fetch(
+            `${API}?ref=${BRANCH}`,
+            { headers: headers() }
+        );
+
+        if (!response.ok) {
+            throw new Error("GitHub dosyası okunamadı: " + await response.text());
+        }
+
+        const file = await response.json();
+
+        const oldContent = Buffer.from(
+            file.content.replace(/\s/g, ""),
+            "base64"
+        ).toString("utf8");
+
+        const newContent =
+            oldContent.replace(/\s*$/, "") + "\n" + line + "\n";
+
+        const update = await fetch(API, {
+            method: "PUT",
+            headers: {
+                ...headers(),
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                message: "New SCP 24h key",
+                content: Buffer.from(newContent).toString("base64"),
+                sha: file.sha,
+                branch: BRANCH
+            })
+        });
+
+        if (update.ok) return true;
+
+        if (update.status !== 409 && update.status !== 422) {
+            throw new Error("GitHub kayıt hatası: " + await update.text());
+        }
+    }
+
+    throw new Error("GitHub dosyası güncellenemedi.");
 }
 
-async function saveKey(line){
- for(let attempt=0;attempt<5;attempt++){
-  const file = await githubRequest(
-   `${API}?ref=${encodeURIComponent(BRANCH)}`
-  );
+// Key üret
+app.post("/api/generate", async (req, res) => {
+    try {
+        if (!process.env.GITHUB_TOKEN) {
+            throw new Error("GitHub token bulunamadı.");
+        }
 
-  if(!file.sha || typeof file.content !== "string"){
-   throw new Error("GitHub dosya içeriği okunamadı.");
-  }
+        const challenge = String(req.body.challenge || "");
+        const session = challenges.get(challenge);
 
-  const oldContent = Buffer.from(
-   file.content.replace(/\s/g,""),"base64"
-  ).toString("utf8");
+        if (!session || session.used) {
+            return res.status(403).json({
+                error: "Geçersiz işlem. Tekrar başlat."
+            });
+        }
 
-  const newContent =
-   oldContent.replace(/\s*$/,"") + "\n" + line + "\n";
+        if (Date.now() - session.createdAt < 30000) {
+            return res.status(429).json({
+                error: "30 saniye henüz dolmadı."
+            });
+        }
 
-  try {
-   await githubRequest(API,{
-    method:"PUT",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-     message:"SCP new 24-hour key",
-     content:Buffer.from(newContent,"utf8").toString("base64"),
-     sha:file.sha,
-     branch:BRANCH
-    })
-   });
+        session.used = true;
 
-   return true;
-  } catch(error){
-   if(!error.message.includes("409") &&
-      !error.message.includes("422")){
-    throw error;
-   }
-  }
- }
+        const key = "SCP-" +
+            crypto.randomBytes(16).toString("hex").toUpperCase();
 
- throw new Error("GitHub dosyası güncellenemedi. Tekrar dene.");
-}
+        const expires = Date.now() + 86400000;
 
-// İlk aşama: Sunucu tarafında bekleme başlat.
-app.post("/api/start",(req,res)=>{
- const challenge = crypto.randomBytes(32).toString("hex");
+        await saveKey(`${key}|${expires}`);
 
- challenges.set(challenge,{
-  createdAt:Date.now(),
-  used:false
- });
+        challenges.delete(challenge);
 
- res.json({
-  success:true,
-  challenge
- });
+        res.json({
+            success: true,
+            key,
+            expires
+        });
+
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            error: error.message
+        });
+    }
 });
 
-// İkinci aşama: 30 saniye dolduysa key üret.
-app.post("/api/generate",async(req,res)=>{
- try {
-  if(!process.env.GITHUB_TOKEN){
-   return res.status(500).json({
-    error:"GITHUB_TOKEN .env dosyasında bulunamadı."
-   });
-  }
+// Key doğrulama
+app.post("/api/verify", async (req, res) => {
+    try {
+        const key = String(req.body.key || "");
 
-  const challenge = String(req.body.challenge || "");
-  const session = challenges.get(challenge);
+        if (!/^SCP-[A-F0-9]{32}$/.test(key)) {
+            return res.json({ valid: false });
+        }
 
-  if(!session){
-   return res.status(403).json({
-    error:"Geçersiz işlem. Yeniden başlat."
-   });
-  }
+        const response = await fetch(
+            `${API}?ref=${BRANCH}`,
+            { headers: headers() }
+        );
 
-  if(session.used){
-   return res.status(403).json({
-    error:"Bu işlem daha önce kullanılmış."
-   });
-  }
+        if (!response.ok) {
+            throw new Error("GitHub okunamadı.");
+        }
 
-  if(Date.now()-session.createdAt < 30000){
-   return res.status(429).json({
-    error:"30 saniyelik bekleme henüz tamamlanmadı."
-   });
-  }
+        const file = await response.json();
 
-  session.used = true;
+        const content = Buffer.from(
+            file.content.replace(/\s/g, ""),
+            "base64"
+        ).toString("utf8");
 
-  const key = "SCP-" +
-   crypto.randomBytes(16).toString("hex").toUpperCase();
+        const row = content.split(/\r?\n/).find(
+            line => line.split("|")[0] === key
+        );
 
-  const expires = Date.now() + 24*60*60*1000;
+        if (!row) {
+            return res.json({ valid: false });
+        }
 
-  await saveKey(`${key}|${expires}`);
+        const expiry = Number(row.split("|")[1]);
 
-  challenges.delete(challenge);
+        res.json({
+            valid: Number.isFinite(expiry) && expiry > Date.now(),
+            expires: expiry
+        });
 
-  res.json({
-   success:true,
-   key,
-   expires
-  });
-
- } catch(error){
-  console.error("GENERATE ERROR:",error);
-
-  res.status(500).json({
-   error:error.message || "Key oluşturulamadı."
-  });
- }
+    } catch (error) {
+        res.status(500).json({
+            valid: false,
+            error: error.message
+        });
+    }
 });
 
-// Key doğrulama.
-app.post("/api/verify",async(req,res)=>{
- try {
-  const key = String(req.body.key || "");
-
-  if(!/^SCP-[A-F0-9]{32}$/.test(key)){
-   return res.json({valid:false});
-  }
-
-  const file = await githubRequest(
-   `${API}?ref=${encodeURIComponent(BRANCH)}`
-  );
-
-  const content = Buffer.from(
-   file.content.replace(/\s/g,""),"base64"
-  ).toString("utf8");
-
-  const record = content.split(/\r?\n/).find(row=>{
-   const parts = row.split("|");
-   return parts[0] === key;
-  });
-
-  if(!record){
-   return res.json({valid:false});
-  }
-
-  const expiry = Number(record.split("|")[1]);
-
-  res.json({
-   valid:Number.isFinite(expiry) && expiry > Date.now(),
-   expires:expiry
-  });
-
- } catch(error){
-  console.error("VERIFY ERROR:",error);
-  res.status(500).json({
-   valid:false,
-   error:"Doğrulama yapılamadı."
-  });
- }
-});
-
-// JSON cevaplı bulunamayan adres.
-app.use((req,res)=>{
- res.status(404).json({
-  error:"API adresi bulunamadı: " + req.path
- });
-});
-
-// Önce API rotaları, ardından HTML dosyaları.
+// HTML dosyaları
 app.use(express.static("public"));
 
-app.listen(PORT,()=>{
- console.log("SCP KEY GENERATOR hazır.");
- console.log(`Adres: http://localhost:${PORT}`);
+// Bulunamayan adresler
+app.use((req, res) => {
+    res.status(404).json({
+        error: "API adresi bulunamadı: " + req.path
+    });
+});
+
+app.listen(PORT, () => {
+    console.log("SCP KEY GENERATOR hazır!");
+    console.log("http://localhost:" + PORT);
 });
