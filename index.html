@@ -3,115 +3,177 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SCP Key Generator</title>
 <style>
 *{box-sizing:border-box}
 body{
- margin:0;min-height:100vh;display:grid;place-items:center;
- background:radial-gradient(circle at top,#172c50,#080d18 65%);
- color:white;font-family:Arial,sans-serif;padding:20px
+ margin:0;min-height:100vh;display:flex;align-items:center;
+ justify-content:center;padding:20px;
+ background:radial-gradient(ellipse at top,#18345e,#080d18 70%);
+ font-family:Arial,sans-serif;color:#fff
 }
 .panel{
- width:100%;max-width:390px;padding:32px 25px;
- background:#101a2b;border:1px solid #263b5b;
- border-radius:20px;text-align:center;
+ width:100%;max-width:410px;background:#111c2e;
+ border:1px solid #293d5d;border-radius:20px;
+ padding:30px 25px;text-align:center;
  box-shadow:0 20px 70px #0008
 }
-.logo{font-size:42px;margin-bottom:12px}
-h1{font-size:25px;margin:8px}
-p{color:#9cacc4;font-size:14px;line-height:1.6}
+.logo{font-size:48px;margin-bottom:12px}
+h1{font-size:23px;margin:8px 0}
+.desc{font-size:14px;color:#9eacc2;line-height:1.7}
 button{
- width:100%;padding:15px;border:0;border-radius:10px;
- background:#2675ed;color:white;font-size:15px;
- font-weight:bold;cursor:pointer;margin-top:15px
+ width:100%;border:0;border-radius:10px;padding:15px;
+ background:#2675ed;color:white;font-weight:bold;
+ font-size:15px;cursor:pointer;margin-top:17px;
+ transition:.2s
 }
 button:hover{background:#3988ff}
-button:disabled{opacity:.5;cursor:wait}
-.timer{font-size:38px;font-weight:bold;margin:25px;color:#64a4ff}
+button:disabled{opacity:.5;cursor:not-allowed}
+.timer{font-size:46px;font-weight:bold;color:#62a5ff;margin:25px}
 .key{
  background:#091321;border:1px dashed #3988ff;
- border-radius:10px;padding:16px;overflow-wrap:anywhere;
- margin-top:18px;color:#76b2ff;font-weight:bold
+ padding:16px;border-radius:10px;color:#78b5ff;
+ overflow-wrap:anywhere;font-weight:bold;margin-top:15px
 }
 .hidden{display:none}
-.status{font-size:13px;color:#7f91ad;margin-top:18px}
+.status{font-size:13px;color:#91a3bd;margin-top:20px;line-height:1.6}
+.small{font-size:12px;color:#788ba8;margin-top:15px}
 </style>
 </head>
 <body>
 <div class="panel">
  <div class="logo">🔑</div>
  <h1>SCP KEY GENERATOR</h1>
- <p>24 saat geçerli özel erişim anahtarını oluştur.</p>
+ <p class="desc">Özel erişim anahtarını oluştur. Her key 24 saat geçerlidir.</p>
 
  <button id="generate" onclick="start()">KEY ÜRET</button>
 
  <div id="waiting" class="hidden">
-  <p>Discord'a yönlendirildin. Geri sayım başladı.</p>
+  <p class="desc">Discord davet bağlantısı açıldı.</p>
   <div class="timer" id="timer">30</div>
-  <p>Key hazırlanıyor...</p>
+  <p class="desc">Key oluşturulması için bekleniyor...</p>
  </div>
 
  <div id="result" class="hidden">
-  <p>Key başarıyla oluşturuldu!</p>
+  <p class="desc">Key başarıyla oluşturuldu!</p>
   <div class="key" id="key"></div>
   <button onclick="copyKey()">KEY KOPYALA</button>
-  <p>Geçerlilik: 24 saat</p>
+  <p class="small">Geçerlilik süresi: 24 saat</p>
  </div>
 
  <div class="status" id="status">Sistem hazır.</div>
 </div>
 
 <script>
-let generatedKey="";
+const $ = id => document.getElementById(id);
+
+let generatedKey = "";
+let challenge = "";
+let busy = false;
+
+async function api(url, body = {}) {
+ const response = await fetch(url,{
+  method:"POST",
+  headers:{"Content-Type":"application/json"},
+  body:JSON.stringify(body)
+ });
+
+ const raw = await response.text();
+ let data;
+
+ try {
+  data = JSON.parse(raw);
+ } catch {
+  throw new Error(
+   "Sunucu JSON yerine farklı cevap verdi. HTTP " +
+   response.status + ": " + raw.slice(0,120)
+  );
+ }
+
+ if(!response.ok) {
+  throw new Error(data.error || "Sunucu hatası: " + response.status);
+ }
+
+ return data;
+}
 
 async function start(){
- const button=document.getElementById("generate");
- button.disabled=true;
- document.getElementById("waiting").classList.remove("hidden");
- document.getElementById("status").textContent="Discord bağlantısı açıldı.";
+ if(busy) return;
+ busy = true;
 
- window.open("https://discord.gg/nnZvv63jSy","_blank");
+ $("generate").disabled = true;
+ $("waiting").classList.remove("hidden");
+ $("result").classList.add("hidden");
+ $("status").textContent = "İşlem başlatılıyor...";
 
- let remaining=30;
- document.getElementById("timer").textContent=remaining;
+ try {
+  // Sunucuda 30 saniyelik bekleme başlatılır.
+  const startData = await api("/api/start");
+  challenge = startData.challenge;
 
- const countdown=setInterval(async()=>{
-  remaining--;
-  document.getElementById("timer").textContent=remaining;
+  // Kullanıcı etkileşimi sırasında Discord açılır.
+  const discordWindow = window.open(
+   "https://discord.gg/nnZvv63jSy","_blank"
+  );
 
-  if(remaining<=0){
-   clearInterval(countdown);
-   document.getElementById("status").textContent="Key oluşturuluyor...";
-
-   try{
-    const response=await fetch("/api/generate",{
-     method:"POST",
-     headers:{"Content-Type":"application/json"},
-     body:JSON.stringify({})
-    });
-    const data=await response.json();
-
-    if(!response.ok) throw new Error(data.error||"İşlem başarısız");
-
-    generatedKey=data.key;
-    document.getElementById("key").textContent=generatedKey;
-    document.getElementById("result").classList.remove("hidden");
-    document.getElementById("waiting").classList.add("hidden");
-    document.getElementById("status").textContent="Key hazır.";
-   }catch(error){
-    document.getElementById("status").textContent=error.message;
-    button.disabled=false;
-    button.textContent="TEKRAR DENE";
-    document.getElementById("waiting").classList.add("hidden");
-   }
+  if(!discordWindow){
+   $("status").textContent =
+    "Discord penceresi engellenmiş olabilir. Tarayıcı açılır pencerelerine izin ver.";
   }
- },1000);
+
+  let remaining = 30;
+  $("timer").textContent = remaining;
+  $("status").textContent = "Geri sayım başladı.";
+
+  const countdown = setInterval(async()=>{
+   remaining--;
+   $("timer").textContent = remaining;
+
+   if(remaining <= 0){
+    clearInterval(countdown);
+
+    try {
+     $("status").textContent = "GitHub'a kaydediliyor...";
+
+     const data = await api("/api/generate",{
+      challenge:challenge
+     });
+
+     generatedKey = data.key;
+     $("key").textContent = generatedKey;
+     $("waiting").classList.add("hidden");
+     $("result").classList.remove("hidden");
+     $("status").textContent = "Key hazır. 24 saat boyunca geçerli.";
+    } catch(error) {
+     $("waiting").classList.add("hidden");
+     $("status").textContent = error.message;
+     $("generate").disabled = false;
+     $("generate").textContent = "TEKRAR DENE";
+    }
+
+    busy = false;
+   }
+  },1000);
+
+ } catch(error) {
+  $("waiting").classList.add("hidden");
+  $("status").textContent = error.message;
+  $("generate").disabled = false;
+  $("generate").textContent = "TEKRAR DENE";
+  busy = false;
+ }
 }
 
 async function copyKey(){
- await navigator.clipboard.writeText(generatedKey);
- document.getElementById("status").textContent="Key kopyalandı!";
+ if(!generatedKey) return;
+
+ try {
+  await navigator.clipboard.writeText(generatedKey);
+  $("status").textContent = "Key kopyalandı!";
+ } catch {
+  $("status").textContent = "Kopyalama başarısız. Key'i elle kopyala.";
+ }
 }
 </script>
 </body>
