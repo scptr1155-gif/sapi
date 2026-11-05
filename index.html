@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -26,11 +25,11 @@ button{
  border:0;border-radius:10px;background:#2675ed;
  color:white;font-weight:bold;font-size:15px;cursor:pointer
 }
-button:disabled{opacity:.5}
+button:disabled{opacity:.5;cursor:wait}
 .timer{font-size:46px;color:#62a5ff;font-weight:bold;margin:25px}
 .key{
  padding:16px;background:#091321;border:1px dashed #3988ff;
- border-radius:10px;color:#78b5ff;overflow-wrap:anywhere
+ border-radius:10px;color:#78b5ff;overflow-wrap:anywhere;user-select:all
 }
 .hidden{display:none}
 .status{font-size:13px;margin-top:20px}
@@ -54,7 +53,7 @@ button:disabled{opacity:.5}
   <p>Key başarıyla oluşturuldu!</p>
   <div class="key" id="key"></div>
   <button onclick="copyKey()">KEY KOPYALA</button>
-  <p>Geçerlilik: 24 saat</p>
+  <p>Geçerlilik: 24 saat. Yeni keyin aktif olması birkaç dakika sürebilir.</p>
  </div>
 
  <div class="status" id="status">Sistem hazır.</div>
@@ -90,7 +89,7 @@ async function start(){
  busy=true;
  $("generate").disabled=true;
  $("waiting").classList.remove("hidden");
- $("result").classList.add("hidden");
+ $("result").classList.add("hidden");   // eski key gizlenir, yenisi uretilecek
  $("status").textContent="İşlem başlatılıyor...";
 
  // Açılır pencere engelini azaltmak için tıklama anında aç.
@@ -100,35 +99,37 @@ async function start(){
   const data=await api("/api/start");
   const challenge=data.challenge;
 
-  let seconds=30;
-  $("timer").textContent=seconds;
+  // Sayac saate gore hesaplanir: sekme arka planda olsa bile sapmaz.
+  const end=Date.now()+(data.waitMs||30000);
+  $("timer").textContent=Math.ceil((end-Date.now())/1000);
   $("status").textContent="Geri sayım başladı.";
 
   const interval=setInterval(async()=>{
-   seconds--;
-   $("timer").textContent=seconds;
+   const left=Math.max(0,Math.ceil((end-Date.now())/1000));
+   $("timer").textContent=left;
+   if(left>0)return;
 
-   if(seconds<=0){
-    clearInterval(interval);
+   clearInterval(interval);
 
-    try{
-     $("status").textContent="GitHub'a kaydediliyor...";
-     const result=await api("/api/generate",{challenge});
+   try{
+    $("status").textContent="GitHub'a kaydediliyor...";
+    const result=await api("/api/generate",{challenge});
 
-     generatedKey=result.key;
-     $("key").textContent=generatedKey;
-     $("waiting").classList.add("hidden");
-     $("result").classList.remove("hidden");
-     $("status").textContent="Key hazır. 24 saat geçerli.";
-    }catch(error){
-     $("waiting").classList.add("hidden");
-     $("status").textContent=error.message;
-     $("generate").textContent="TEKRAR DENE";
-     $("generate").disabled=false;
-    }
-    busy=false;
+    generatedKey=result.key;
+    $("key").textContent=generatedKey;
+    $("waiting").classList.add("hidden");
+    $("result").classList.remove("hidden");
+    $("status").textContent="Key hazır. 24 saat geçerli.";
+    $("generate").textContent="YENİ KEY ÜRET";
+   }catch(error){
+    $("waiting").classList.add("hidden");
+    $("status").textContent=error.message;
+    $("generate").textContent="TEKRAR DENE";
    }
-  },1000);
+
+   $("generate").disabled=false;
+   busy=false;
+  },250);
 
  }catch(error){
   $("waiting").classList.add("hidden");
