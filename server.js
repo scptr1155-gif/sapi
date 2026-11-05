@@ -23,8 +23,13 @@ function safeEqual(a,b){
  return x.length===y.length && crypto.timingSafeEqual(x,y);
 }
 
+// Vercel'e yapistirirken kalan bosluk/tirnaklari temizler
+function env(name){
+ return String(process.env[name]||"").trim().replace(/^["']|["']$/g,"");
+}
+
 function sign(payload){
- return crypto.createHmac("sha256",process.env.HMAC_SECRET)
+ return crypto.createHmac("sha256",env("HMAC_SECRET"))
   .update(payload).digest("hex");
 }
 
@@ -47,7 +52,7 @@ async function github(url,options={}){
  const response=await fetch(url,{
   ...options,
   headers:{
-   Authorization:`Bearer ${process.env.GITHUB_TOKEN}`,
+   Authorization:`Bearer ${env("GITHUB_TOKEN")}`,
    Accept:"application/vnd.github+json",
    "X-GitHub-Api-Version":"2022-11-28",
    "User-Agent":"SCP-Key-Generator",
@@ -122,12 +127,11 @@ async function saveKey(key,expires,nonceId){
 
 module.exports=async function(req,res){
  try{
-  if(!process.env.GITHUB_TOKEN)
-   return send(res,500,{error:"GITHUB_TOKEN eksik."});
-
-  if(!process.env.HMAC_SECRET ||
-     process.env.HMAC_SECRET.length<32)
-   return send(res,500,{error:"HMAC_SECRET eksik veya kısa."});
+  const missing=[];
+  if(!env("GITHUB_TOKEN")) missing.push("GITHUB_TOKEN");
+  if(env("HMAC_SECRET").length<32) missing.push("HMAC_SECRET (en az 32 karakter)");
+  if(missing.length)
+   return send(res,500,{error:"Vercel ortam değişkeni eksik: "+missing.join(", ")+". Ekledikten sonra Redeploy et."});
 
   const url=new URL(req.url,"https://vercel.app");
   const route=url.pathname;
