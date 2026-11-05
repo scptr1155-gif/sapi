@@ -1,153 +1,499 @@
+
 <!DOCTYPE html>
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#080b14">
 <title>SCP Key Generator</title>
 <style>
-*{box-sizing:border-box}
+*{box-sizing:border-box;margin:0;padding:0}
 body{
- margin:0;min-height:100vh;display:grid;place-items:center;
- padding:20px;background:radial-gradient(circle at top,#19375f,#080d18 70%);
- color:white;font-family:Arial,sans-serif
+ min-height:100vh;display:flex;align-items:center;justify-content:center;
+ padding:20px;background:radial-gradient(circle at top,#1c3157,transparent 48%),#080b14;
+ color:#fff;font-family:Arial,sans-serif
+}
+.container{
+ width:100%;max-width:460px;padding:30px 24px;
+ background:#101a2c;border:1px solid #29446c;border-radius:22px;
+ box-shadow:0 20px 70px #0009;text-align:center
+}
+.logo{
+ width:65px;height:65px;margin:0 auto 17px;border-radius:18px;
+ display:grid;place-items:center;font-size:29px;font-weight:bold;
+ background:linear-gradient(135deg,#2563eb,#0891b2);
+ box-shadow:0 0 25px #2563eb55
+}
+h1{font-size:25px;letter-spacing:1px}
+.subtitle{color:#94a3b8;font-size:13px;line-height:1.7;margin:10px 0 22px}
+.badge{
+ display:inline-block;padding:8px 14px;border-radius:30px;
+ background:#1d3557;color:#60a5fa;font-size:11px;font-weight:bold;
+ margin-bottom:18px
 }
 .panel{
- width:100%;max-width:410px;background:#111c2e;
- border:1px solid #293d5d;border-radius:20px;
- padding:30px 25px;text-align:center;
- box-shadow:0 20px 70px #0008
+ background:#091426;border:1px solid #243c5e;border-radius:14px;
+ padding:21px 15px;margin-bottom:17px
 }
-.logo{font-size:48px}
-h1{font-size:23px}
-p{font-size:14px;color:#9eacc2;line-height:1.6}
-button{
- width:100%;padding:15px;margin-top:15px;
- border:0;border-radius:10px;background:#2675ed;
- color:white;font-weight:bold;font-size:15px;cursor:pointer
+.panel-label{font-size:11px;color:#94a3b8;margin-bottom:10px}
+.timer{
+ font-size:43px;font-weight:bold;letter-spacing:3px;
+ color:#60a5fa;font-variant-numeric:tabular-nums
 }
-button:disabled{opacity:.5;cursor:wait}
-.timer{font-size:46px;color:#62a5ff;font-weight:bold;margin:25px}
-.key{
- padding:16px;background:#091321;border:1px dashed #3988ff;
- border-radius:10px;color:#78b5ff;overflow-wrap:anywhere;user-select:all
+.description{font-size:12px;color:#94a3b8;line-height:1.7;margin-bottom:18px}
+button,.discord{
+ width:100%;display:block;padding:15px;border:0;border-radius:10px;
+ font-size:13px;font-weight:bold;cursor:pointer;text-decoration:none;
+ transition:.2s
 }
-.hidden{display:none}
-.status{font-size:13px;margin-top:20px}
+button:hover,.discord:hover{filter:brightness(1.15);transform:translateY(-1px)}
+button:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.generate{color:white;background:linear-gradient(110deg,#2563eb,#0891b2)}
+.discord{
+ margin-top:11px;background:#26395f;color:#c7d2fe;
+ border:1px solid #38527e
+}
+.key-area{
+ display:none;margin-top:18px;padding:18px;
+ background:#071d19;border:1px solid #187455;border-radius:13px
+}
+.key-title{color:#34d399;font-weight:bold;font-size:12px;margin-bottom:13px}
+.key-text{
+ padding:14px 8px;background:#06120f;border:1px dashed #258b69;
+ color:#6ee7b7;font-size:14px;font-weight:bold;word-break:break-all;
+ border-radius:8px;user-select:all
+}
+.copy{background:#34d399;color:#052e24;margin-top:12px}
+.expiry{font-size:11px;color:#94a3b8;line-height:1.7;margin-top:12px}
+.notice{
+ display:none;margin-top:14px;padding:12px;border-radius:9px;
+ background:#391b25;border:1px solid #853747;color:#fda4af;
+ font-size:12px;line-height:1.6
+}
+.verify-area{
+ margin-top:24px;padding-top:22px;border-top:1px solid #293b58;
+ text-align:left
+}
+.verify-area h2{text-align:center;font-size:16px;margin-bottom:7px}
+.verify-info{text-align:center;color:#94a3b8;font-size:11px;margin-bottom:16px}
+input{
+ width:100%;padding:14px;border-radius:9px;outline:none;
+ border:1px solid #334b70;background:#091426;color:white;
+ font-size:13px;margin-bottom:10px
+}
+input:focus{border-color:#3b82f6}
+.verify-btn{background:#253d65;color:white}
+.verify-result{
+ display:none;margin-top:12px;padding:12px;border-radius:9px;
+ font-size:12px;line-height:1.6
+}
+.success{display:block;background:#092b21;color:#6ee7b7;border:1px solid #187455}
+.failure{display:block;background:#391b25;color:#fda4af;border:1px solid #853747}
+.footer{
+ border-top:1px solid #293b58;margin-top:24px;padding-top:16px;
+ font-size:10px;color:#64748b;line-height:1.8
+}
+.footer span{color:#60a5fa}
 </style>
 </head>
 <body>
-<div class="panel">
- <div class="logo">🔑</div>
- <h1>SCP KEY GENERATOR</h1>
- <p>24 saat geçerli erişim anahtarını oluştur.</p>
 
- <button id="generate" onclick="start()">KEY ÜRET</button>
+<main class="container">
+ <div class="logo">S</div>
+ <h1>SCP KEY SYSTEM</h1>
+ <p class="subtitle">Güvenli anahtar oluşturma ve doğrulama sistemi.</p>
 
- <div id="waiting" class="hidden">
-  <p>Discord daveti açıldı. Bekleme süresi:</p>
-  <div class="timer" id="timer">30</div>
-  <p>Key hazırlanıyor...</p>
+ <div class="badge" id="status">● SİSTEM HAZIR</div>
+
+ <div class="panel">
+  <div class="panel-label" id="timerLabel">BEKLEME SÜRESİ</div>
+  <div class="timer" id="timer">00:30</div>
  </div>
 
- <div id="result" class="hidden">
-  <p>Key başarıyla oluşturuldu!</p>
-  <div class="key" id="key"></div>
-  <button onclick="copyKey()">KEY KOPYALA</button>
-  <p>Geçerlilik: 24 saat. Yeni keyin aktif olması birkaç dakika sürebilir.</p>
+ <p class="description" id="description">
+  KEY ÜRET butonuna bas. Discord daveti açılacak.
+  30 saniye sonra anahtarın sunucuya kaydedilecek.
+ </p>
+
+ <button class="generate" id="generateButton">KEY ÜRET</button>
+
+ <a class="discord" href="https://discord.gg/nnZvv63jSy"
+ target="_blank" rel="noopener noreferrer">
+  DISCORD SUNUCUSUNA GİT
+ </a>
+
+ <div class="key-area" id="keyArea">
+  <div class="key-title">✓ KEY BAŞARIYLA OLUŞTURULDU</div>
+  <div class="key-text" id="keyText"></div>
+  <button class="copy" id="copyButton">KEY'İ KOPYALA</button>
+  <div class="expiry" id="expiry"></div>
  </div>
 
- <div class="status" id="status">Sistem hazır.</div>
-</div>
+ <div class="notice" id="notice"></div>
+
+ <section class="verify-area">
+  <h2>KEY DOĞRULAMA</h2>
+  <p class="verify-info">Key'in geçerliliğini sunucudan kontrol et.</p>
+  <input type="text" id="verifyInput"
+   placeholder="SCP-XXXXXX-XXXXXX-..."
+   autocomplete="off" spellcheck="false">
+  <button class="verify-btn" id="verifyButton">KEY DOĞRULA</button>
+  <div class="verify-result" id="verifyResult"></div>
+ </section>
+
+ <div class="footer">
+  SCP KEY SYSTEM · <span>24 HOURS</span><br>
+  SERVER-SIDE KEY VALIDATION
+ </div>
+</main>
 
 <script>
-const $ = id => document.getElementById(id);
-let busy=false;
-let generatedKey="";
+"use strict";
 
-async function api(url,body={}){
- const response=await fetch(url,{
+const API_URL = "/api/key";
+const DISCORD_URL = "https://discord.gg/nnZvv63jSy";
+const STORAGE = "scp_secure_key_state";
+
+const $ = id => document.getElementById(id);
+
+const generateButton = $("generateButton");
+const verifyButton = $("verifyButton");
+const timer = $("timer");
+const timerLabel = $("timerLabel");
+const statusBox = $("status");
+const description = $("description");
+const keyArea = $("keyArea");
+const keyText = $("keyText");
+const expiry = $("expiry");
+const notice = $("notice");
+const verifyInput = $("verifyInput");
+const verifyResult = $("verifyResult");
+const copyButton = $("copyButton");
+
+let state = loadState();
+let completing = false;
+let verifying = false;
+let retryAt = 0;
+
+function loadState(){
+ try{
+  const value = JSON.parse(localStorage.getItem(STORAGE));
+  if(!value || !["waiting","active"].includes(value.phase)) return null;
+  return value;
+ }catch{
+  return null;
+ }
+}
+
+function saveState(){
+ try{
+  localStorage.setItem(STORAGE,JSON.stringify(state));
+ }catch(error){
+  console.error(error);
+  showNotice("Tarayıcı depolama alanına yazılamadı.");
+ }
+}
+
+function clearState(){
+ state = null;
+ try{localStorage.removeItem(STORAGE)}catch{}
+}
+
+async function apiRequest(body){
+ const response = await fetch(API_URL,{
   method:"POST",
   headers:{"Content-Type":"application/json"},
+  cache:"no-store",
   body:JSON.stringify(body)
  });
 
- const raw=await response.text();
  let data;
 
  try{
-  data=JSON.parse(raw);
+  data = await response.json();
  }catch{
-  throw new Error("Sunucu cevabı geçersiz: "+raw.slice(0,100));
+  throw new Error("Sunucudan geçersiz yanıt geldi.");
  }
 
- if(!response.ok) throw new Error(data.error||"HTTP "+response.status);
+ if(!response.ok){
+  const error = new Error(data.error || "İşlem başarısız.");
+  error.status = response.status;
+  error.data = data;
+  throw error;
+ }
+
  return data;
 }
 
-async function start(){
- if(busy)return;
- busy=true;
- $("generate").disabled=true;
- $("waiting").classList.remove("hidden");
- $("result").classList.add("hidden");   // eski key gizlenir, yenisi uretilecek
- $("status").textContent="İşlem başlatılıyor...";
+function formatTime(ms){
+ const seconds = Math.max(0,Math.floor(ms/1000));
+ const days = Math.floor(seconds/86400);
+ const hours = Math.floor((seconds%86400)/3600);
+ const minutes = Math.floor((seconds%3600)/60);
+ const secs = seconds%60;
 
- // Açılır pencere engelini azaltmak için tıklama anında aç.
- window.open("https://discord.gg/nnZvv63jSy","_blank");
+ const h = String(hours).padStart(2,"0");
+ const m = String(minutes).padStart(2,"0");
+ const s = String(secs).padStart(2,"0");
+
+ if(days>0) return days+"g "+h+":"+m+":"+s;
+ if(hours>0) return h+":"+m+":"+s;
+ return m+":"+s;
+}
+
+function showNotice(message){
+ notice.textContent = message;
+ notice.style.display = "block";
+}
+
+function hideNotice(){
+ notice.style.display = "none";
+}
+
+function showExpired(){
+ clearState();
+
+ statusBox.textContent = "● KEY SÜRESİ DOLDU";
+ statusBox.style.color = "#f87171";
+ timerLabel.textContent = "KEY GEÇERSİZ";
+ timer.textContent = "EXPIRED";
+ timer.style.color = "#f87171";
+ keyArea.style.display = "none";
+
+ description.textContent =
+  "Bu key'in 24 saatlik kullanım süresi sona erdi.";
+
+ generateButton.disabled = false;
+ generateButton.textContent = "YENİ KEY ÜRET";
+
+ showNotice("Key'in süresi doldu. Yeni bir key oluşturabilirsin.");
+}
+
+function render(){
+ hideNotice();
+
+ if(!state){
+  statusBox.textContent = "● SİSTEM HAZIR";
+  statusBox.style.color = "#60a5fa";
+  timerLabel.textContent = "BEKLEME SÜRESİ";
+  timer.textContent = "00:30";
+  timer.style.color = "#60a5fa";
+  keyArea.style.display = "none";
+
+  description.textContent =
+   "KEY ÜRET butonuna bas. Discord daveti açılacak. 30 saniye sonra anahtarın sunucuya kaydedilecek.";
+
+  generateButton.disabled = false;
+  generateButton.textContent = "KEY ÜRET";
+  return;
+ }
+
+ if(state.phase==="waiting"){
+  const remaining = state.readyAt-Date.now();
+
+  statusBox.textContent = "● DOĞRULAMA BEKLENİYOR";
+  statusBox.style.color = "#60a5fa";
+  timerLabel.textContent = "KEY HAZIRLANIYOR";
+  timer.textContent = formatTime(remaining);
+  timer.style.color = "#60a5fa";
+  keyArea.style.display = "none";
+
+  description.textContent =
+   "Geri sayım tamamlandığında sunucu key'i GitHub'a kaydedecek.";
+
+  generateButton.disabled = true;
+  generateButton.textContent = "KEY HAZIRLANIYOR...";
+  return;
+ }
+
+ if(state.phase==="active"){
+  const remaining = Date.parse(state.expiresAt)-Date.now();
+
+  if(!Number.isFinite(remaining) || remaining<=0){
+   showExpired();
+   return;
+  }
+
+  statusBox.textContent = "● KEY AKTİF";
+  statusBox.style.color = "#34d399";
+  timerLabel.textContent = "KALAN GEÇERLİLİK";
+  timer.textContent = formatTime(remaining);
+  timer.style.color = "#34d399";
+  keyArea.style.display = "block";
+  keyText.textContent = state.key;
+
+  expiry.textContent =
+   "Sunucu bitiş tarihi: "+
+   new Date(state.expiresAt).toLocaleString("tr-TR");
+
+  description.textContent =
+   "Key'in sunucuda kayıtlı. Süresi dolana kadar kullanabilirsin.";
+
+  generateButton.disabled = true;
+  generateButton.textContent = "AKTİF KEY MEVCUT";
+ }
+}
+
+async function startGeneration(){
+ if(state && state.phase==="waiting"){
+  render();
+  return;
+ }
+
+ if(state && state.phase==="active" &&
+    Date.parse(state.expiresAt)>Date.now()){
+  render();
+  return;
+ }
+
+ generateButton.disabled = true;
+ generateButton.textContent = "BAŞLATILIYOR...";
+
+ // Kullanıcı tıklarken Discord sekmesini aç.
+ window.open(DISCORD_URL,"_blank","noopener,noreferrer");
 
  try{
-  const data=await api("/api/start");
-  const challenge=data.challenge;
+  const data = await apiRequest({action:"start"});
 
-  // Sayac saate gore hesaplanir: sekme arka planda olsa bile sapmaz.
-  const end=Date.now()+(data.waitMs||30000);
-  $("timer").textContent=Math.ceil((end-Date.now())/1000);
-  $("status").textContent="Geri sayım başladı.";
+  state = {
+   phase:"waiting",
+   challenge:data.challenge,
+   readyAt:data.readyAt
+  };
 
-  const interval=setInterval(async()=>{
-   const left=Math.max(0,Math.ceil((end-Date.now())/1000));
-   $("timer").textContent=left;
-   if(left>0)return;
-
-   clearInterval(interval);
-
-   try{
-    $("status").textContent="GitHub'a kaydediliyor...";
-    const result=await api("/api/generate",{challenge});
-
-    generatedKey=result.key;
-    $("key").textContent=generatedKey;
-    $("waiting").classList.add("hidden");
-    $("result").classList.remove("hidden");
-    $("status").textContent="Key hazır. 24 saat geçerli.";
-    $("generate").textContent="YENİ KEY ÜRET";
-   }catch(error){
-    $("waiting").classList.add("hidden");
-    $("status").textContent=error.message;
-    $("generate").textContent="TEKRAR DENE";
-   }
-
-   $("generate").disabled=false;
-   busy=false;
-  },250);
+  saveState();
+  render();
 
  }catch(error){
-  $("waiting").classList.add("hidden");
-  $("status").textContent=error.message;
-  $("generate").disabled=false;
-  $("generate").textContent="TEKRAR DENE";
-  busy=false;
+  state = null;
+  render();
+  showNotice(error.message);
  }
 }
 
-async function copyKey(){
+async function completeGeneration(){
+ if(completing || !state || state.phase!=="waiting") return;
+ if(Date.now()<retryAt) return;
+
+ completing = true;
+
  try{
-  await navigator.clipboard.writeText(generatedKey);
-  $("status").textContent="Key kopyalandı!";
- }catch{
-  $("status").textContent="Key'i elle kopyalayabilirsin.";
+  const data = await apiRequest({
+   action:"complete",
+   challenge:state.challenge
+  });
+
+  state = {
+   phase:"active",
+   key:data.key,
+   expiresAt:data.expiresAt
+  };
+
+  saveState();
+  render();
+
+ }catch(error){
+  if(error.status===425 && error.data){
+   state.readyAt = Date.now()+
+    Math.max(1000,error.data.remainingMs||1000);
+   saveState();
+  }else if(error.status===410 || error.status===403){
+   clearState();
+   render();
+   showNotice(error.message);
+  }else{
+   retryAt = Date.now()+3000;
+   showNotice(error.message+" Otomatik tekrar denenecek.");
+  }
+ }finally{
+  completing = false;
  }
 }
+
+async function verifyKey(){
+ if(verifying) return;
+
+ const key = verifyInput.value.trim().toUpperCase();
+
+ if(!key){
+  verifyResult.className = "verify-result failure";
+  verifyResult.textContent = "Lütfen bir key gir.";
+  return;
+ }
+
+ verifying = true;
+ verifyButton.disabled = true;
+ verifyButton.textContent = "KONTROL EDİLİYOR...";
+ verifyResult.style.display = "none";
+
+ try{
+  const data = await apiRequest({
+   action:"verify",
+   key
+  });
+
+  if(data.valid){
+   verifyResult.className = "verify-result success";
+   verifyResult.textContent =
+    "✓ KEY GEÇERLİ · Son kullanma: "+
+    new Date(data.expiresAt).toLocaleString("tr-TR");
+  }else if(data.reason==="expired"){
+   verifyResult.className = "verify-result failure";
+   verifyResult.textContent = "✕ KEY'İN SÜRESİ DOLMUŞ.";
+  }else{
+   verifyResult.className = "verify-result failure";
+   verifyResult.textContent = "✕ GEÇERSİZ KEY.";
+  }
+
+ }catch(error){
+  verifyResult.className = "verify-result failure";
+  verifyResult.textContent = "Sunucu hatası: "+error.message;
+ }finally{
+  verifyResult.style.display = "block";
+  verifying = false;
+  verifyButton.disabled = false;
+  verifyButton.textContent = "KEY DOĞRULA";
+ }
+}
+
+generateButton.addEventListener("click",startGeneration);
+verifyButton.addEventListener("click",verifyKey);
+
+verifyInput.addEventListener("keydown",event=>{
+ if(event.key==="Enter") verifyKey();
+});
+
+copyButton.addEventListener("click",async()=>{
+ if(!state || state.phase!=="active") return;
+
+ try{
+  await navigator.clipboard.writeText(state.key);
+  copyButton.textContent = "✓ KOPYALANDI";
+  setTimeout(()=>copyButton.textContent="KEY'İ KOPYALA",2000);
+ }catch{
+  verifyInput.value = state.key;
+  showNotice("Key doğrulama alanına aktarıldı. Buradan kopyalayabilirsin.");
+ }
+});
+
+function tick(){
+ if(state && state.phase==="waiting"){
+  if(state.readyAt<=Date.now()){
+   timer.textContent = "00:00";
+   completeGeneration();
+  }else{
+   render();
+  }
+  return;
+ }
+
+ if(state && state.phase==="active"){
+  render();
+ }
+}
+
+render();
+setInterval(tick,1000);
 </script>
 </body>
 </html>
