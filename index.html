@@ -1,236 +1,118 @@
-// SCP Studio key generator - Cloudflare Worker (site + API in one file)
-// Secrets to add in Cloudflare: GITHUB_TOKEN (fine-grained, Contents: read/write) and SECRET (any long random text)
 
-const CFG = {
-  OWNER: "scptr1155-gif",
-  REPO: "fly-noclip-scpstudio",
-  BRANCH: "main",
-  KEY_FILE: "code82437",            // one key per line (the raw file your script reads)
-  META_FILE: "code82437-meta.json", // expiry bookkeeping, keeps the key file clean
-  DISCORD_URL: "https://discord.gg/nnZvv63jSy",
-  WAIT_SECONDS: 30,                 // background timer length
-  KEY_TTL_HOURS: 24,
-  ONE_KEY_PER_IP: true,             // same visitor gets the same key until it expires
-};
-
-const enc = new TextEncoder();
-const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-async function hmac(secret, msg) {
-  const k = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  return b64u(await crypto.subtle.sign("HMAC", k, enc.encode(msg)));
-}
-const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json", "cache-control": "no-store" } });
-
-function genKey() {
-  const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const s = [...crypto.getRandomValues(new Uint8Array(12))].map((x) => A[x % 32]).join("");
-  return "SCP-" + s.slice(0, 4) + "-" + s.slice(4, 8) + "-" + s.slice(8, 12);
-}
-
-// ---- GitHub contents API ----
-async function gh(env, method, path, body) {
-  return fetch("https://api.github.com/repos/" + CFG.OWNER + "/" + CFG.REPO + "/contents/" + path + (method === "GET" ? "?ref=" + CFG.BRANCH : ""), {
-    method,
-    headers: {
-      Authorization: "Bearer " + env.GITHUB_TOKEN,
-      Accept: "application/vnd.github+json",
-      "User-Agent": "scp-key-worker",
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-}
-async function readFile(env, path) {
-  const r = await gh(env, "GET", path);
-  if (r.status === 404) return { text: "", sha: null };
-  if (!r.ok) { const e = new Error("github read " + r.status); e.status = r.status; throw e; }
-  const j = await r.json();
-  return { text: atob(j.content.replace(/\n/g, "")), sha: j.sha };
-}
-async function writeFile(env, path, text, sha, message) {
-  const r = await gh(env, "PUT", path, { message, content: btoa(text), branch: CFG.BRANCH, sha: sha || undefined });
-  if (!r.ok) { const e = new Error("github write " + r.status); e.status = r.status; throw e; }
-}
-
-// Removes expired keys; when p is given, also adds (or returns) a key for that visitor.
-async function sync(env, p) {
-  for (let i = 0; ; i++) {
-    try {
-      const now = Date.now();
-      const [kf, mf] = await Promise.all([readFile(env, CFG.KEY_FILE), readFile(env, CFG.META_FILE)]);
-      let meta = [];
-      try { meta = JSON.parse(mf.text || "[]"); } catch (e) {}
-      const dead = new Set(meta.filter((m) => m.exp <= now).map((m) => m.k));
-      meta = meta.filter((m) => m.exp > now);
-      let entry = null;
-      if (p) {
-        entry = meta.find((m) => m.n === p.n) || (CFG.ONE_KEY_PER_IP ? meta.find((m) => m.h === p.h) : null);
-        if (!entry) {
-          entry = { k: genKey(), exp: now + CFG.KEY_TTL_HOURS * 3600000, h: p.h, n: p.n };
-          meta.push(entry);
-        }
-      }
-      const lines = kf.text.split(/\r?\n/).map((s) => s.trim()).filter((l) => l && !dead.has(l));
-      if (entry && !lines.includes(entry.k)) lines.push(entry.k);
-      const keysOut = lines.length ? lines.join("\n") + "\n" : "";
-      const metaOut = JSON.stringify(meta);
-      if (metaOut !== mf.text) await writeFile(env, CFG.META_FILE, metaOut, mf.sha, "update key meta");
-      if (keysOut !== kf.text) await writeFile(env, CFG.KEY_FILE, keysOut, kf.sha, "update keys");
-      return entry;
-    } catch (e) {
-      if (i >= 3 || (e.status !== 409 && e.status !== 422)) throw e; // retry only on write conflicts
-    }
-  }
-}
-
-export default {
-  async fetch(req, env) {
-    const u = new URL(req.url);
-    if (req.method === "POST" && u.pathname.startsWith("/api/")) {
-      if (!env.GITHUB_TOKEN || !env.SECRET) return json({ error: "not configured" }, 500);
-      try {
-        if (u.pathname === "/api/start") {
-          const ip = req.headers.get("CF-Connecting-IP") || "0";
-          const h = (await hmac(env.SECRET, "ip:" + ip)).slice(0, 16);
-          const pl = b64u(enc.encode(JSON.stringify({ t: Date.now(), n: crypto.randomUUID(), h })));
-          return json({ token: pl + "." + (await hmac(env.SECRET, pl)), waitMs: CFG.WAIT_SECONDS * 1000 });
-        }
-        if (u.pathname === "/api/claim") {
-          const body = await req.json().catch(() => ({}));
-          const [pl, sig] = String(body.token || "").split(".");
-          if (!pl || !sig || sig !== (await hmac(env.SECRET, pl))) return json({ error: "invalid" }, 400);
-          const p = JSON.parse(atob(pl.replace(/-/g, "+").replace(/_/g, "/")));
-          const left = p.t + CFG.WAIT_SECONDS * 1000 - Date.now();
-          if (left > 0) return json({ error: "early", retryMs: left }, 425);
-          if (Date.now() - p.t > 6 * 3600000) return json({ error: "expired" }, 400);
-          const e = await sync(env, p);
-          return json({ key: e.k, exp: e.exp });
-        }
-      } catch (e) {
-        return json({ error: "server" }, 500);
-      }
-    }
-    return new Response(PAGE.replace("__DISCORD__", CFG.DISCORD_URL).replace("__WAIT__", String(CFG.WAIT_SECONDS)), {
-      headers: { "content-type": "text/html;charset=utf-8" },
-    });
-  },
-  // Cron trigger: removes expired keys even when nobody visits the site
-  async scheduled(event, env, ctx) {
-    ctx.waitUntil(sync(env, null).catch(() => {}));
-  },
-};
-
-const PAGE = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SCP Studio Key</title>
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SCP Key Generator</title>
 <style>
-:root{--bg:#2338e8;--paper:#f3f4f8;--ink:#0f1226;--mute:#5f647f;--hi:#ffd23f;color-scheme:light}
 *{box-sizing:border-box}
-[hidden]{display:none!important}
-html,body{height:100%;margin:0}
-body{background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:grid;place-items:center;padding:20px}
-.t{width:100%;max-width:420px;background:var(--paper);border-radius:18px}
-.top{padding:26px 26px 24px}
-.brand{font-weight:700;margin-bottom:22px}
-h1{margin:0 0 8px;font:800 40px/1.05 "Bahnschrift","Arial Narrow",system-ui,sans-serif;letter-spacing:-.02em}
-p{margin:0;color:var(--mute);max-width:34ch}
-.key{margin-top:18px;font:700 22px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#fff;border:2px solid var(--ink);border-radius:10px;padding:14px 10px;text-align:center;letter-spacing:.03em;user-select:all;word-break:break-all}
-.stub{position:relative;border-top:2px dashed #c3c6d6;padding:24px 26px 26px}
-.stub:before,.stub:after{content:"";position:absolute;top:-13px;width:24px;height:24px;border-radius:50%;background:var(--bg)}
-.stub:before{left:-12px}.stub:after{right:-12px}
-.btn{width:100%;border:0;border-radius:12px;background:var(--hi);color:var(--ink);font:700 17px system-ui,sans-serif;padding:15px;cursor:pointer}
-.btn:disabled{opacity:.6;cursor:wait}
-.btn:focus-visible,a:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
-small{display:block;margin-top:12px;color:var(--mute);font-size:14px}
-a{color:var(--bg);font-weight:600}
-.num b{font:800 56px/1 "Bahnschrift","Arial Narrow",system-ui,sans-serif}
-.num span{color:var(--mute);margin-left:8px}
-.bar{height:10px;border-radius:5px;background:#dcdff0;overflow:hidden;margin:14px 0 0}
-.bar i{display:block;height:100%;width:0;background:var(--bg);transition:width .3s linear}
-.err{color:#b3261e;font-size:14px;margin-top:12px}
-.err:empty{display:none}
-@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
-</style></head><body>
-<main class="t">
- <section class="top">
-  <div class="brand">SCP Studio</div>
-  <h1 id="h">Get your key</h1>
-  <p id="p">Press the button. Our Discord opens and a short timer runs in the background. When it ends, your key appears here.</p>
-  <div id="key" class="key" hidden></div>
- </section>
- <section class="stub">
-  <div id="idle"><button class="btn" id="go">Generate key</button><small>Each key is valid for 24 hours.</small></div>
-  <div id="wait" hidden>
-   <div class="num"><b id="sec">0</b><span>seconds left</span></div>
-   <div class="bar"><i id="bar"></i></div>
-   <small>You can close this page and come back later, the timer keeps counting. <a id="dl" href="#" target="_blank" rel="noopener">Reopen Discord</a></small>
-  </div>
-  <div id="done" hidden><button class="btn" id="cp">Copy key</button><small id="exp"></small><small>New keys can take up to 5 minutes to activate.</small></div>
-  <div id="err" class="err" role="alert"></div>
- </section>
-</main>
+body{
+ margin:0;min-height:100vh;display:grid;place-items:center;
+ background:radial-gradient(circle at top,#172c50,#080d18 65%);
+ color:white;font-family:Arial,sans-serif;padding:20px
+}
+.panel{
+ width:100%;max-width:390px;padding:32px 25px;
+ background:#101a2b;border:1px solid #263b5b;
+ border-radius:20px;text-align:center;
+ box-shadow:0 20px 70px #0008
+}
+.logo{font-size:42px;margin-bottom:12px}
+h1{font-size:25px;margin:8px}
+p{color:#9cacc4;font-size:14px;line-height:1.6}
+button{
+ width:100%;padding:15px;border:0;border-radius:10px;
+ background:#2675ed;color:white;font-size:15px;
+ font-weight:bold;cursor:pointer;margin-top:15px
+}
+button:hover{background:#3988ff}
+button:disabled{opacity:.5;cursor:wait}
+.timer{font-size:38px;font-weight:bold;margin:25px;color:#64a4ff}
+.key{
+ background:#091321;border:1px dashed #3988ff;
+ border-radius:10px;padding:16px;overflow-wrap:anywhere;
+ margin-top:18px;color:#76b2ff;font-weight:bold
+}
+.hidden{display:none}
+.status{font-size:13px;color:#7f91ad;margin-top:18px}
+</style>
+</head>
+<body>
+<div class="panel">
+ <div class="logo">🔑</div>
+ <h1>SCP KEY GENERATOR</h1>
+ <p>24 saat geçerli özel erişim anahtarını oluştur.</p>
+
+ <button id="generate" onclick="start()">KEY ÜRET</button>
+
+ <div id="waiting" class="hidden">
+  <p>Discord'a yönlendirildin. Geri sayım başladı.</p>
+  <div class="timer" id="timer">30</div>
+  <p>Key hazırlanıyor...</p>
+ </div>
+
+ <div id="result" class="hidden">
+  <p>Key başarıyla oluşturuldu!</p>
+  <div class="key" id="key"></div>
+  <button onclick="copyKey()">KEY KOPYALA</button>
+  <p>Geçerlilik: 24 saat</p>
+ </div>
+
+ <div class="status" id="status">Sistem hazır.</div>
+</div>
+
 <script>
-var D="__DISCORD__",W=__WAIT__*1000,S="scpkey",tm=0,st=null;
-var $=function(i){return document.getElementById(i)};
-try{st=JSON.parse(localStorage.getItem(S)||"null")}catch(e){}
-function save(){try{localStorage.setItem(S,JSON.stringify(st))}catch(e){}}
-function err(m){$("err").textContent=m||""}
-function view(v,h,p){
-  ["idle","wait","done"].forEach(function(x){$(x).hidden=x!==v});
-  $("key").hidden=v!=="done";
-  $("h").textContent=h;$("p").textContent=p;err("");
+let generatedKey="";
+
+async function start(){
+ const button=document.getElementById("generate");
+ button.disabled=true;
+ document.getElementById("waiting").classList.remove("hidden");
+ document.getElementById("status").textContent="Discord bağlantısı açıldı.";
+
+ window.open("https://discord.gg/nnZvv63jSy","_blank");
+
+ let remaining=30;
+ document.getElementById("timer").textContent=remaining;
+
+ const countdown=setInterval(async()=>{
+  remaining--;
+  document.getElementById("timer").textContent=remaining;
+
+  if(remaining<=0){
+   clearInterval(countdown);
+   document.getElementById("status").textContent="Key oluşturuluyor...";
+
+   try{
+    const response=await fetch("/api/generate",{
+     method:"POST",
+     headers:{"Content-Type":"application/json"},
+     body:JSON.stringify({})
+    });
+    const data=await response.json();
+
+    if(!response.ok) throw new Error(data.error||"İşlem başarısız");
+
+    generatedKey=data.key;
+    document.getElementById("key").textContent=generatedKey;
+    document.getElementById("result").classList.remove("hidden");
+    document.getElementById("waiting").classList.add("hidden");
+    document.getElementById("status").textContent="Key hazır.";
+   }catch(error){
+    document.getElementById("status").textContent=error.message;
+    button.disabled=false;
+    button.textContent="TEKRAR DENE";
+    document.getElementById("waiting").classList.add("hidden");
+   }
+  }
+ },1000);
 }
-function idle(){
-  clearInterval(tm);
-  view("idle","Get your key","Press the button. Our Discord opens and a short timer runs in the background. When it ends, your key appears here.");
-  $("go").disabled=false;
+
+async function copyKey(){
+ await navigator.clipboard.writeText(generatedKey);
+ document.getElementById("status").textContent="Key kopyalandı!";
 }
-function wait(){
-  view("wait","Generating your key","Join our Discord while you wait. The timer runs in the background.");
-  $("dl").href=D;
-  clearInterval(tm);tm=setInterval(tick,250);tick();
-}
-function tick(){
-  var left=st.end-Date.now();
-  $("sec").textContent=Math.max(0,Math.ceil(left/1000));
-  $("bar").style.width=Math.min(100,Math.max(0,(1-left/W)*100))+"%";
-  if(left<=0){clearInterval(tm);claim()}
-}
-function claim(){
-  fetch("/api/claim",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:st.token})})
-  .then(function(r){return r.json().then(function(j){return{s:r.status,j:j}})})
-  .then(function(o){
-    if(o.j.key){st={key:o.j.key,exp:o.j.exp};save();done()}
-    else if(o.s===425){st.end=Date.now()+o.j.retryMs+500;save();wait()}
-    else{st=null;save();idle();err("The session expired. Press Generate key to start again.")}
-  })
-  .catch(function(){setTimeout(claim,3000)});
-}
-function done(){
-  view("done","Your key is ready","Paste it into the script. It stops working after 24 hours.");
-  $("key").textContent=st.key;
-  clearInterval(tm);tm=setInterval(upd,1000);upd();
-}
-function upd(){
-  var l=st.exp-Date.now();
-  if(l<=0){st=null;save();idle();return}
-  $("exp").textContent="Expires in "+Math.floor(l/36e5)+"h "+Math.floor(l%36e5/6e4)+"m.";
-}
-$("go").onclick=function(){
-  window.open(D,"_blank","noopener");
-  $("go").disabled=true;
-  fetch("/api/start",{method:"POST"}).then(function(r){return r.json()}).then(function(j){
-    if(!j.token)throw 0;
-    st={token:j.token,end:Date.now()+j.waitMs};save();wait();
-  }).catch(function(){$("go").disabled=false;err("Could not start. Check your connection and try again.")});
-};
-$("cp").onclick=function(){
-  var b=$("cp");
-  (navigator.clipboard?navigator.clipboard.writeText(st.key):Promise.reject()).then(function(){b.textContent="Copied"},function(){err("Copy failed. Select the key and copy it manually.")});
-  setTimeout(function(){b.textContent="Copy key"},1500);
-};
-if(st&&st.key&&st.exp>Date.now())done();
-else if(st&&st.token)wait();
-else{st=null;idle()}
-</script></body></html>`;
+</script>
+</body>
+</html>
