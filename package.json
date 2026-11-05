@@ -1,8 +1,0 @@
-{
-  "name": "scp-key-generator",
-  "version": "4.1.0",
-  "private": true,
-  "engines": {
-    "node": "26.x"
-  }
-}
