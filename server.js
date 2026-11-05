@@ -1,10 +1,11 @@
-
 const crypto = require("crypto");
 
 const OWNER = "scptr1155-gif";
 const REPO = "fly-noclip-scpstudio";
 const PATH = "code82437";
 const BRANCH = "main";
+const WAIT_MS = 30000;               // bekleme suresi
+const KEY_TTL_MS = 24 * 60 * 60 * 1000; // key omru: 24 saat
 
 const GITHUB_API =
  `https://api.github.com/repos/${OWNER}/${REPO}/contents/${PATH}`;
@@ -12,6 +13,7 @@ const GITHUB_API =
 function send(res,status,data){
  res.statusCode=status;
  res.setHeader("Content-Type","application/json; charset=utf-8");
+ res.setHeader("Cache-Control","no-store");
  res.end(JSON.stringify(data));
 }
 
@@ -24,6 +26,21 @@ function safeEqual(a,b){
 function sign(payload){
  return crypto.createHmac("sha256",process.env.HMAC_SECRET)
   .update(payload).digest("hex");
+}
+
+async function readBody(req){
+ if(req.body && typeof req.body==="object" && !Buffer.isBuffer(req.body))
+  return req.body;
+ let raw=typeof req.body==="string" ? req.body : "";
+ if(!raw && !req.readableEnded){
+  raw=await new Promise(resolve=>{
+   let d="";
+   req.on("data",c=>d+=c);
+   req.on("end",()=>resolve(d));
+   req.on("error",()=>resolve(""));
+  });
+ }
+ try{return JSON.parse(raw||"{}")}catch{return {}}
 }
 
 async function github(url,options={}){
@@ -63,12 +80,25 @@ async function readFile(){
  return {file,content};
 }
 
-async function saveKey(key,expires){
+// Satir formati: KEY|bitisZamani|islemId
+// Suresi dolan satirlar silinir, "|" icermeyen (elle yazilmis) satirlar korunur.
+// Ayni islemId ikinci kez gelirse false doner (tek kullanimlik challenge).
+async function saveKey(key,expires,nonceId){
  for(let i=0;i<5;i++){
   const {file,content}=await readFile();
+  const now=Date.now();
 
-  const updated=content.replace(/\s*$/,"")+
-   `\n${key}|${expires}\n`;
+  const lines=content.split(/\r?\n/).map(l=>l.trim()).filter(Boolean)
+   .filter(l=>{
+    const p=l.split("|");
+    const exp=Number(p[1]);
+    return !(p.length>1 && Number.isFinite(exp) && exp<=now);
+   });
+
+  if(lines.some(l=>l.split("|")[2]===nonceId)) return false;
+
+  lines.push(`${key}|${expires}|${nonceId}`);
+  const updated=lines.join("\n")+"\n";
 
   try{
    await github(GITHUB_API,{
@@ -81,7 +111,7 @@ async function saveKey(key,expires){
      branch:BRANCH
     })
    });
-   return;
+   return true;
   }catch(error){
    if(!error.message.includes("409") &&
       !error.message.includes("422")) throw error;
@@ -110,12 +140,14 @@ module.exports=async function(req,res){
 
    return send(res,200,{
     success:true,
-    challenge:payload+"."+sign(payload)
+    challenge:payload+"."+sign(payload),
+    waitMs:WAIT_MS
    });
   }
 
   if(req.method==="POST" && route==="/api/generate"){
-   const challenge=String(req.body?.challenge||"");
+   const body=await readBody(req);
+   const challenge=String(body.challenge||"");
    const parts=challenge.split(".");
 
    if(parts.length!==2)
@@ -135,26 +167,36 @@ module.exports=async function(req,res){
     return send(res,403,{error:"Challenge okunamadı."});
    }
 
+   if(typeof data.nonce!=="string" || !Number.isFinite(data.created))
+    return send(res,403,{error:"Challenge okunamadı."});
+
    const age=Date.now()-data.created;
 
-   if(age<30000)
+   if(age<WAIT_MS)
     return send(res,429,{error:"30 saniye henüz dolmadı."});
 
    if(age>600000)
     return send(res,403,{error:"İşlem süresi dolmuş. Yeniden başlat."});
 
+   // Her istek icin yeni rastgele key
    const key="SCP-"+crypto.randomBytes(16)
     .toString("hex").toUpperCase();
 
-   const expires=Date.now()+86400000;
+   const expires=Date.now()+KEY_TTL_MS;
+   const nonceId=crypto.createHash("sha256")
+    .update(data.nonce).digest("hex").slice(0,16);
 
-   await saveKey(key,expires);
+   const saved=await saveKey(key,expires,nonceId);
+
+   if(!saved)
+    return send(res,409,{error:"Bu işlem zaten kullanıldı. Yeni key için baştan başlat."});
 
    return send(res,200,{success:true,key,expires});
   }
 
   if(req.method==="POST" && route==="/api/verify"){
-   const key=String(req.body?.key||"");
+   const body=await readBody(req);
+   const key=String(body.key||"");
 
    if(!/^SCP-[A-F0-9]{32}$/.test(key))
     return send(res,200,{valid:false});
@@ -182,4 +224,3 @@ module.exports=async function(req,res){
   return send(res,500,{error:error.message||"Sunucu hatası."});
  }
 };
-
