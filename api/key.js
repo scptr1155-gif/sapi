@@ -4,7 +4,7 @@ const crypto = require("node:crypto");
 
 // SENİN GITHUB BİLGİLERİN
 const OWNER = "scptr1155-gif";
-const REPO = "roblozx"; // Repo adı düzeltildi
+const REPO = "fly-noclip-scpstudio"; // Repo adı düzeltildi
 const FILE = "code82437"; // Anahtarların kaydedileceği dosya (GitHub'da boş oluştur)
 const BRANCH = "main";
 
