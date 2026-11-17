@@ -4,13 +4,13 @@ const crypto = require("node:crypto");
 
 // SENİN GITHUB BİLGİLERİN
 const OWNER = "scptr1155-gif";
-const REPO = "fly-noclip-scpstudio"; // Repo adı düzeltildi
-const FILE = "code82437"; // Anahtarların kaydedileceği dosya (GitHub'da boş oluştur)
+const REPO = "fly-noclip-scpstudio";
+const FILE = "code82437";
 const BRANCH = "main";
 
-const WAIT_MS = 30 * 1000; // 30 saniye bekleme
-const KEY_LIFETIME_MS = 24 * 60 * 60 * 1000; // 24 saat geçerlilik
-const CHALLENGE_MAX_AGE_MS = WAIT_MS + 10 * 60 * 1000; // Bilet geçerlilik süresi
+const WAIT_MS = 30 * 1000;
+const KEY_LIFETIME_MS = 24 * 60 * 60 * 1000;
+const CHALLENGE_MAX_AGE_MS = WAIT_MS + 10 * 60 * 1000;
 
 const GITHUB_URL = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE}?ref=${BRANCH}`;
 
@@ -76,11 +76,6 @@ function deriveKey(secret, nonce) {
     return "SCP-" + groups.join("-");
 }
 
-// GitHub'da gerçek key yerine SHA-256 sakla.
-function hashKey(key) {
-    return crypto.createHash("sha256").update(key).digest("hex");
-}
-
 async function getGithubFile(token) {
     const result = await fetch(GITHUB_URL, { headers: githubHeaders(token), cache: "no-store" });
     if (!result.ok) throw new Error("GitHub dosyası okunamadı. HTTP " + result.status);
@@ -90,12 +85,12 @@ async function getGithubFile(token) {
     return { sha: data.sha, content };
 }
 
-function findRecord(content, hash) {
+function findRecord(content, key) {
     const lines = content.split(/\r?\n/);
     for (const line of lines) {
         const parts = line.trim().split("|");
         if (parts.length !== 2) continue;
-        if (parts[0] !== hash) continue;
+        if (parts[0] !== key) continue;
         const expiresAt = Date.parse(parts[1]);
         if (!Number.isFinite(expiresAt)) continue;
         return { expiresAt, date: parts[1] };
@@ -103,14 +98,14 @@ function findRecord(content, hash) {
     return null;
 }
 
-async function appendGithubRecord(token, hash) {
+async function appendGithubRecord(token, key) {
     for (let attempt = 0; attempt < 4; attempt++) {
         const file = await getGithubFile(token);
-        const existing = findRecord(file.content, hash);
+        const existing = findRecord(file.content, key);
         if (existing) return existing.date;
 
         const expiresAt = new Date(Date.now() + KEY_LIFETIME_MS).toISOString();
-        const record = `${hash}|${expiresAt}`;
+        const record = `${key}|${expiresAt}`;
         const oldContent = file.content.replace(/\s+$/, "");
         const newContent = (oldContent ? oldContent + "\n" : "") + record + "\n";
 
@@ -138,9 +133,8 @@ async function verifyKey(token, key) {
     const pattern = /^SCP-(?:[A-F0-9]{6}-){5}[A-F0-9]{6}$/;
     if (!pattern.test(key)) return { valid: false, reason: "invalid" };
 
-    const hash = hashKey(key);
     const file = await getGithubFile(token);
-    const record = findRecord(file.content, hash);
+    const record = findRecord(file.content, key);
 
     if (!record) return { valid: false, reason: "not_found" };
     if (record.expiresAt <= Date.now()) return { valid: false, reason: "expired", expiresAt: record.date };
@@ -182,8 +176,7 @@ module.exports = async function handler(req, res) {
             if (elapsed > CHALLENGE_MAX_AGE_MS) return send(res, 410, { success: false, error: "Doğrulama biletinin süresi doldu." });
 
             const key = deriveKey(secret, payload.nonce);
-            const hash = hashKey(key);
-            const savedExpiry = await appendGithubRecord(token, hash);
+            const savedExpiry = await appendGithubRecord(token, key);
 
             return send(res, 200, { success: true, key, expiresAt: savedExpiry });
         }
