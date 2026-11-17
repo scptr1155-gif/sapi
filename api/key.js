@@ -9,8 +9,12 @@ const FILE = "code82437";
 const BRANCH = "main";
 
 const WAIT_MS = 30 * 1000;
-const KEY_LIFETIME_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+const KEY_LIFETIME_MS = 24 * HOUR_MS;
 const CHALLENGE_MAX_AGE_MS = WAIT_MS + 10 * 60 * 1000;
+
+// SCP-XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX (ilk grup üretim saati)
+const KEY_PATTERN = /^SCP-([0-9A-F]{6})(?:-[0-9A-F]{6}){5}$/;
 
 const GITHUB_URL = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE}?ref=${BRANCH}`;
 
@@ -66,14 +70,39 @@ function readChallenge(ticket, secret) {
         const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
         if (!Number.isSafeInteger(payload.issuedAt) || typeof payload.nonce !== "string" || !/^[a-f0-9]{48}$/.test(payload.nonce)) return null;
         return payload;
-    } catch { return null; }
+    } catch {
+        return null;
+    }
 }
 
-// Rastgele ve imzalı biletten benzersiz key üret.
-function deriveKey(secret, nonce) {
-    const raw = crypto.createHmac("sha256", secret).update("key:" + nonce).digest("hex").toUpperCase().slice(0, 36);
-    const groups = raw.match(/.{6}/g);
+// Key üret: ilk grup üretim saati (saat cinsinden, hex), kalan kısım HMAC.
+function deriveKey(secret, nonce, issuedHour) {
+    const hex = crypto.createHmac("sha256", secret).update("key:" + nonce).digest("hex").toUpperCase().slice(0, 30);
+    const timePart = issuedHour.toString(16).toUpperCase().padStart(6, "0");
+    const groups = (timePart + hex).match(/.{6}/g);
     return "SCP-" + groups.join("-");
+}
+
+// Key'den üretim saatini oku. Geçersiz formatsa null döner.
+function keyHour(key) {
+    const match = KEY_PATTERN.exec(key);
+    if (!match) return null;
+    return parseInt(match[1], 16);
+}
+
+function keyExpiresAt(key) {
+    const hour = keyHour(key);
+    if (hour === null) return null;
+    return hour * HOUR_MS + KEY_LIFETIME_MS;
+}
+
+function isLive(key, now) {
+    const expiresAt = keyExpiresAt(key);
+    return expiresAt !== null && now < expiresAt;
+}
+
+function parseKeys(content) {
+    return content.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
 }
 
 async function getGithubFile(token) {
@@ -85,29 +114,17 @@ async function getGithubFile(token) {
     return { sha: data.sha, content };
 }
 
-function findRecord(content, key) {
-    const lines = content.split(/\r?\n/);
-    for (const line of lines) {
-        const parts = line.trim().split("|");
-        if (parts.length !== 2) continue;
-        if (parts[0] !== key) continue;
-        const expiresAt = Date.parse(parts[1]);
-        if (!Number.isFinite(expiresAt)) continue;
-        return { expiresAt, date: parts[1] };
-    }
-    return null;
-}
-
-async function appendGithubRecord(token, key) {
+// Süresi dolmuş ve bozuk satırları temizleyerek key'i dosyaya ekle.
+async function appendGithubKey(token, key) {
     for (let attempt = 0; attempt < 4; attempt++) {
         const file = await getGithubFile(token);
-        const existing = findRecord(file.content, key);
-        if (existing) return existing.date;
+        const now = Date.now();
+        const live = parseKeys(file.content).filter(k => isLive(k, now));
 
-        const expiresAt = new Date(Date.now() + KEY_LIFETIME_MS).toISOString();
-        const record = `${key}|${expiresAt}`;
-        const oldContent = file.content.replace(/\s+$/, "");
-        const newContent = (oldContent ? oldContent + "\n" : "") + record + "\n";
+        if (live.includes(key)) return;
+        live.push(key);
+
+        const newContent = live.join("\n") + "\n";
 
         const result = await fetch(GITHUB_URL, {
             method: "PUT",
@@ -120,7 +137,7 @@ async function appendGithubRecord(token, key) {
             })
         });
 
-        if (result.ok) return expiresAt;
+        if (result.ok) return;
         if ((result.status === 409 || result.status === 422) && attempt < 3) continue;
         throw new Error("GitHub dosyasına yazılamadı. HTTP " + result.status);
     }
@@ -130,15 +147,18 @@ async function appendGithubRecord(token, key) {
 async function verifyKey(token, key) {
     if (typeof key !== "string") return { valid: false, reason: "invalid" };
     key = key.trim().toUpperCase();
-    const pattern = /^SCP-(?:[A-F0-9]{6}-){5}[A-F0-9]{6}$/;
-    if (!pattern.test(key)) return { valid: false, reason: "invalid" };
+    if (!KEY_PATTERN.test(key)) return { valid: false, reason: "invalid" };
 
     const file = await getGithubFile(token);
-    const record = findRecord(file.content, key);
+    const keys = parseKeys(file.content);
+    if (!keys.includes(key)) return { valid: false, reason: "not_found" };
 
-    if (!record) return { valid: false, reason: "not_found" };
-    if (record.expiresAt <= Date.now()) return { valid: false, reason: "expired", expiresAt: record.date };
-    return { valid: true, reason: "active", expiresAt: record.date };
+    const expiresAtMs = keyExpiresAt(key);
+    if (expiresAtMs === null || expiresAtMs <= Date.now()) {
+        return { valid: false, reason: "expired" };
+    }
+
+    return { valid: true, reason: "active", expiresAt: new Date(expiresAtMs).toISOString() };
 }
 
 module.exports = async function handler(req, res) {
@@ -175,10 +195,12 @@ module.exports = async function handler(req, res) {
             if (elapsed < WAIT_MS) return send(res, 425, { success: false, error: "Bekleme süresi tamamlanmadı.", remainingMs: WAIT_MS - elapsed });
             if (elapsed > CHALLENGE_MAX_AGE_MS) return send(res, 410, { success: false, error: "Doğrulama biletinin süresi doldu." });
 
-            const key = deriveKey(secret, payload.nonce);
-            const savedExpiry = await appendGithubRecord(token, key);
+            const issuedHour = Math.floor(Date.now() / HOUR_MS);
+            const key = deriveKey(secret, payload.nonce, issuedHour);
+            await appendGithubKey(token, key);
 
-            return send(res, 200, { success: true, key, expiresAt: savedExpiry });
+            const expiresAt = new Date(issuedHour * HOUR_MS + KEY_LIFETIME_MS).toISOString();
+            return send(res, 200, { success: true, key, expiresAt });
         }
 
         if (body.action === "verify") {
