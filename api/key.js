@@ -10,7 +10,7 @@ const BRANCH = "main";
 
 const WAIT_MS = 30 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
-const KEY_LIFETIME_MS = 24 * HOUR_MS;
+const KEY_LIFETIME_MS = 14 * HOUR_MS;
 const CHALLENGE_MAX_AGE_MS = WAIT_MS + 10 * 60 * 1000;
 
 // SCP-XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX (ilk grup üretim saati)
@@ -114,7 +114,7 @@ async function getGithubFile(token) {
     return { sha: data.sha, content };
 }
 
-// Süresi dolmuş ve bozuk satırları temizleyerek key'i dosyaya ekle.
+// Süresi dolmuş (14 saat geçmiş) ve bozuk satırları silerek key'i dosyaya ekle.
 async function appendGithubKey(token, key) {
     for (let attempt = 0; attempt < 4; attempt++) {
         const file = await getGithubFile(token);
