@@ -14,12 +14,12 @@
 
   /* ================= GENİŞ EKRAN PANELİ ================= */
   #scpPanel {
-    width:100%;max-width:800px; /* Genişlik artırıldı */
+    width:100%;max-width:800px;
     background:#101a2c;border:1px solid #29446c;border-radius:20px;
     box-shadow:0 25px 80px #0009;
     display: none; 
     animation: fadeIn 0.5s ease;
-    overflow: hidden; /* Taşmaları önle */
+    overflow: hidden;
   }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -47,7 +47,7 @@
   /* ================= İKİ SÜTUNLU YAPI ================= */
   .panel-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr; /* Yan yana 2 eşit sütun */
+    grid-template-columns: 1fr 1fr;
   }
 
   .panel-col {
@@ -57,7 +57,6 @@
     gap: 15px;
   }
 
-  /* Sol Sütun ile Sağ Sütun Arasına Çizgi */
   .panel-col:first-child {
     border-right: 1px solid #29446c;
   }
@@ -85,9 +84,11 @@
   .generate{color:white;background:linear-gradient(110deg,#2563eb,#0891b2)}
   .discord{background:#26395f;color:#c7d2fe;border:1px solid #38527e}
   
+  /* YENİ: Artık sağ sütunda yer alacak olan buton */
   .regen-btn {
     background: #391b25; color: #fda4af; border: 1px solid #853747;
-    display: none; margin-top: 10px;
+    display: none; /* Başlangıçta gizli */
+    margin-top: 5px;
   }
   .regen-btn:hover { background: #4d222f; }
 
@@ -167,7 +168,7 @@
   .verify-btn { width: 100%; padding: 10px; background: #2563eb; border: none; border-radius: 6px; color: #fff; font-weight: 600; font-size: 13px; cursor: pointer; }
   .success-state { display: none; color: #10b981; font-size: 13px; font-weight: 500; align-items: center; justify-content: center; gap: 8px; padding: 6px 0; }
 
-  /* Mobil Uyumluluk (Ekran küçülürse alt alta geçer) */
+  /* Mobil Uyumluluk */
   @media (max-width: 768px) {
     #scpPanel { max-width: 400px; }
     .panel-grid { grid-template-columns: 1fr; }
@@ -245,15 +246,10 @@
           <div class="expiry" id="expiry"></div>
         </div>
 
-        <!-- Yeni Key Üretme Butonu -->
-        <button class="regen-btn" id="regenButton" onclick="deleteAndRegenerate()">
-          🗑️ Mevcut Key'i Sil ve Yenisini Üret
-        </button>
-
         <div class="notice" id="notice"></div>
       </div>
 
-      <!-- SAĞ SÜTUN (Key Doğrulama) -->
+      <!-- SAĞ SÜTUN (Key Doğrulama ve Sıfırlama) -->
       <div class="panel-col">
         <div class="verify-box">
           <h2>KEY DOĞRULAMA</h2>
@@ -262,6 +258,11 @@
           <button class="verify-btn" id="verifyButton">KEY DOĞRULA</button>
           <div class="verify-result" id="verifyResult"></div>
         </div>
+
+        <!-- TAŞINAN BUTON: Artık Sağ Sütunda -->
+        <button class="regen-btn" id="regenButton" onclick="deleteAndRegenerate()">
+          🗑️ Mevcut Key'i Sil ve Yenisini Üret
+        </button>
       </div>
 
     </div>
@@ -484,7 +485,7 @@
       description.textContent = "Key'in sunucuda kayıtlı. Süresi dolana kadar kullanabilirsin.";
       
       generateButton.disabled = true; generateButton.textContent = "AKTİF KEY MEVCUT";
-      regenButton.style.display = "block"; 
+      regenButton.style.display = "block"; // Artık sağ sütunda görünecek
      }
     }
 
