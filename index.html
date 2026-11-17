@@ -8,131 +8,142 @@
   *{box-sizing:border-box;margin:0;padding:0}
   body{
     min-height:100vh;display:flex;align-items:center;justify-content:center;
-    padding:20px;background:radial-gradient(circle at top,#1c3157,transparent 48%),#080b14;
+    padding:15px;background:radial-gradient(circle at top,#1c3157,transparent 48%),#080b14;
     color:#fff;font-family:Arial,sans-serif; overflow: hidden;
   }
 
-  /* Sadece CAPTCHA geçildiğinde görünecek olan asıl panel */
+  /* Boyut Küçültüldü */
   #scpPanel {
-    width:100%;max-width:460px;padding:30px 24px;
-    background:#101a2c;border:1px solid #29446c;border-radius:22px;
-    box-shadow:0 20px 70px #0009;text-align:center;
-    display: none; /* Başlangıçta gizli */
+    width:100%;max-width:380px;padding:20px 18px;
+    background:#101a2c;border:1px solid #29446c;border-radius:18px;
+    box-shadow:0 15px 50px #0009;text-align:center;
+    display: none; 
     animation: fadeIn 0.5s ease;
   }
 
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
   .logo{
-    width:65px;height:65px;margin:0 auto 17px;border-radius:18px;
-    display:grid;place-items:center;font-size:29px;font-weight:bold;
+    width:50px;height:50px;margin:0 auto 12px;border-radius:14px;
+    display:grid;place-items:center;font-size:24px;font-weight:bold;
     background:linear-gradient(135deg,#2563eb,#0891b2);
-    box-shadow:0 0 25px #2563eb55
+    box-shadow:0 0 20px #2563eb55
   }
-  h1{font-size:25px;letter-spacing:1px}
-  .subtitle{color:#94a3b8;font-size:13px;line-height:1.7;margin:10px 0 22px}
+  h1{font-size:20px;letter-spacing:1px}
+  .subtitle{color:#94a3b8;font-size:11px;line-height:1.5;margin:6px 0 15px}
+  
   .badge{
-    display:inline-block;padding:8px 14px;border-radius:30px;
-    background:#1d3557;color:#60a5fa;font-size:11px;font-weight:bold;
-    margin-bottom:18px
+    display:inline-block;padding:6px 12px;border-radius:20px;
+    background:#1d3557;color:#60a5fa;font-size:10px;font-weight:bold;
+    margin-bottom:12px
   }
+  
   .panel{
-    background:#091426;border:1px solid #243c5e;border-radius:14px;
-    padding:21px 15px;margin-bottom:17px
+    background:#091426;border:1px solid #243c5e;border-radius:12px;
+    padding:15px 12px;margin-bottom:12px
   }
-  .panel-label{font-size:11px;color:#94a3b8;margin-bottom:10px}
+  .panel-label{font-size:10px;color:#94a3b8;margin-bottom:6px}
   .timer{
-    font-size:43px;font-weight:bold;letter-spacing:3px;
+    font-size:34px;font-weight:bold;letter-spacing:2px;
     color:#60a5fa;font-variant-numeric:tabular-nums
   }
-  .description{font-size:12px;color:#94a3b8;line-height:1.7;margin-bottom:18px}
+  .description{font-size:11px;color:#94a3b8;line-height:1.5;margin-bottom:12px}
+  
   button,.discord{
-    width:100%;display:block;padding:15px;border:0;border-radius:10px;
-    font-size:13px;font-weight:bold;cursor:pointer;text-decoration:none;
+    width:100%;display:block;padding:12px;border:0;border-radius:8px;
+    font-size:12px;font-weight:bold;cursor:pointer;text-decoration:none;
     transition:.2s
   }
   button:hover,.discord:hover{filter:brightness(1.15);transform:translateY(-1px)}
   button:disabled{opacity:.55;cursor:not-allowed;transform:none}
-  .generate{color:white;background:linear-gradient(110deg,#2563eb,#0891b2)}
-  .discord{
-    margin-top:11px;background:#26395f;color:#c7d2fe;
-    border:1px solid #38527e
-  }
   
-  /* KEY ALANI (Sadece oluşturulan key burada görünür) */
+  .generate{color:white;background:linear-gradient(110deg,#2563eb,#0891b2)}
+  .discord{margin-top:8px;background:#26395f;color:#c7d2fe;border:1px solid #38527e}
+  
+  /* YENİ EKLENEN: ESKİYİ SİL VE YENİ ÜRET BUTONU */
+  .regen-btn {
+    background: #391b25;
+    color: #fda4af;
+    border: 1px solid #853747;
+    margin-top: 12px;
+    display: none; /* Sadece aktif key varsa görünür */
+  }
+  .regen-btn:hover { background: #4d222f; }
+
   .key-area{
-    display:none;margin-top:18px;padding:18px;
-    background:#071d19;border:1px solid #187455;border-radius:13px
+    display:none;margin-top:12px;padding:14px;
+    background:#071d19;border:1px solid #187455;border-radius:10px
   }
-  .key-title{color:#34d399;font-weight:bold;font-size:12px;margin-bottom:13px}
+  .key-title{color:#34d399;font-weight:bold;font-size:11px;margin-bottom:10px}
   .key-text{
-    padding:14px 8px;background:#06120f;border:1px dashed #258b69;
-    color:#6ee7b7;font-size:14px;font-weight:bold;word-break:break-all;
-    border-radius:8px;user-select:all
+    padding:12px 6px;background:#06120f;border:1px dashed #258b69;
+    color:#6ee7b7;font-size:13px;font-weight:bold;word-break:break-all;
+    border-radius:6px;user-select:all
   }
-  .copy{background:#34d399;color:#052e24;margin-top:12px}
-  .expiry{font-size:11px;color:#94a3b8;line-height:1.7;margin-top:12px}
+  .copy{background:#34d399;color:#052e24;margin-top:10px;padding:10px;}
+  .expiry{font-size:10px;color:#94a3b8;line-height:1.5;margin-top:10px}
   
   .notice{
-    display:none;margin-top:14px;padding:12px;border-radius:9px;
+    display:none;margin-top:10px;padding:10px;border-radius:8px;
     background:#391b25;border:1px solid #853747;color:#fda4af;
-    font-size:12px;line-height:1.6
+    font-size:11px;line-height:1.5
   }
+  
   .verify-area{
-    margin-top:24px;padding-top:22px;border-top:1px solid #293b58;
+    margin-top:16px;padding-top:16px;border-top:1px solid #293b58;
     text-align:left
   }
-  .verify-area h2{text-align:center;font-size:16px;margin-bottom:7px}
-  .verify-info{text-align:center;color:#94a3b8;font-size:11px;margin-bottom:16px}
+  .verify-area h2{text-align:center;font-size:14px;margin-bottom:5px}
+  .verify-info{text-align:center;color:#94a3b8;font-size:10px;margin-bottom:12px}
   input{
-    width:100%;padding:14px;border-radius:9px;outline:none;
+    width:100%;padding:12px;border-radius:8px;outline:none;
     border:1px solid #334b70;background:#091426;color:white;
-    font-size:13px;margin-bottom:10px
+    font-size:12px;margin-bottom:8px
   }
   input:focus{border-color:#3b82f6}
   .verify-btn{background:#253d65;color:white}
   .verify-result{
-    display:none;margin-top:12px;padding:12px;border-radius:9px;
-    font-size:12px;line-height:1.6
+    display:none;margin-top:10px;padding:10px;border-radius:8px;
+    font-size:11px;line-height:1.5
   }
   .success{display:block;background:#092b21;color:#6ee7b7;border:1px solid #187455}
   .failure{display:block;background:#391b25;color:#fda4af;border:1px solid #853747}
+  
   .footer{
-    border-top:1px solid #293b58;margin-top:24px;padding-top:16px;
-    font-size:10px;color:#64748b;line-height:1.8
+    border-top:1px solid #293b58;margin-top:16px;padding-top:12px;
+    font-size:9px;color:#64748b;line-height:1.6
   }
   .footer span{color:#60a5fa}
 
-  /* ================= CAPTCHA KATMANI ================= */
+  /* ================= CAPTCHA ================= */
   #captchaOverlay {
     position: fixed; inset: 0; background: rgba(8, 11, 20, 0.95);
     display: flex; justify-content: center; align-items: center;
     z-index: 9999; transition: opacity 0.5s ease;
   }
   .captcha-widget {
-    width: 340px; background: #1f212a; border: 1px solid rgba(255, 255, 255, 0.08);
+    width: 320px; background: #1f212a; border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px; padding: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.9);
     box-sizing: border-box;
   }
-  .loading-state { display: flex; align-items: center; justify-content: center; gap: 12px; color: #9ca3af; font-size: 14px; padding: 8px 0; }
+  .loading-state { display: flex; align-items: center; justify-content: center; gap: 12px; color: #9ca3af; font-size: 13px; padding: 6px 0; }
   .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.1); border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .error-state { display: none; color: #ef4444; font-size: 13px; font-weight: 500; align-items: center; justify-content: center; gap: 8px; padding: 8px 0; }
+  .error-state { display: none; color: #ef4444; font-size: 13px; font-weight: 500; align-items: center; justify-content: center; gap: 8px; padding: 6px 0; }
   .verify-state { display: none; flex-direction: column; }
-  .verify-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); }
-  .verify-header img { height: 18px; object-fit: contain; filter: brightness(0) invert(1); opacity: 0.9; }
-  .verify-header span { font-size: 13px; color: #f3f4f6; font-weight: 500; }
-  .verify-question { font-size: 20px; font-weight: 700; text-align: center; color: #f3f4f6; background: rgba(0, 0, 0, 0.2); padding: 12px; border-radius: 8px; letter-spacing: 1px; margin-bottom: 12px; }
+  .verify-header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .verify-header img { height: 16px; object-fit: contain; filter: brightness(0) invert(1); opacity: 0.9; }
+  .verify-header span { font-size: 12px; color: #f3f4f6; font-weight: 500; }
+  .verify-question { font-size: 18px; font-weight: 700; text-align: center; color: #f3f4f6; background: rgba(0, 0, 0, 0.2); padding: 10px; border-radius: 8px; letter-spacing: 1px; margin-bottom: 10px; }
   .verify-input-group { display: flex; flex-direction: column; gap: 8px; }
-  .verify-input-group input { width: 100%; padding: 10px 12px; background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; color: #f3f4f6; text-align: center; outline: none; font-size: 14px; margin-bottom: 0; }
+  .verify-input-group input { width: 100%; padding: 10px; background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; color: #f3f4f6; text-align: center; outline: none; font-size: 13px; margin-bottom: 0; }
   .verify-input-group input:focus { border-color: #2563eb; }
-  .verify-btn { width: 100%; padding: 10px; background: #2563eb; border: none; border-radius: 6px; color: #fff; font-weight: 600; font-size: 14px; cursor: pointer; }
-  .success-state { display: none; color: #10b981; font-size: 14px; font-weight: 500; align-items: center; justify-content: center; gap: 8px; padding: 8px 0; }
+  .verify-btn { width: 100%; padding: 10px; background: #2563eb; border: none; border-radius: 6px; color: #fff; font-weight: 600; font-size: 13px; cursor: pointer; }
+  .success-state { display: none; color: #10b981; font-size: 13px; font-weight: 500; align-items: center; justify-content: center; gap: 8px; padding: 6px 0; }
 </style>
 </head>
 <body>
 
-  <!-- ================= 1. CAPTCHA KATMANI ================= -->
   <div id="captchaOverlay">
     <div class="captcha-widget" id="captchaWidget">
       <div class="loading-state" id="loadingState">
@@ -161,7 +172,6 @@
     </div>
   </div>
 
-  <!-- ================= 2. ASIL SİTE (Sadece Key Alanı) ================= -->
   <main class="container" id="scpPanel">
     <div class="logo">S</div>
     <h1>SCP KEY SYSTEM</h1>
@@ -185,13 +195,17 @@
       DISCORD SUNUCUSUNA GİT
     </a>
 
-    <!-- SADECE OLUŞTURULAN KEY'İN GÖRÜNECEĞİ ALAN -->
     <div class="key-area" id="keyArea">
       <div class="key-title">✓ KEY BAŞARIYLA OLUŞTURULDU</div>
       <div class="key-text" id="keyText"></div>
       <button class="copy" id="copyButton">KEY'İ KOPYALA</button>
       <div class="expiry" id="expiry"></div>
     </div>
+
+    <!-- YENİ: Mevcut Key'i Sil ve Yenisini Üret -->
+    <button class="regen-btn" id="regenButton" onclick="deleteAndRegenerate()">
+      🗑️ Mevcut Key'i Sil ve Yenisini Üret
+    </button>
 
     <div class="notice" id="notice"></div>
 
@@ -209,7 +223,6 @@
     </div>
   </main>
 
-  <!-- ================= 3. MANTIK KODU ================= -->
   <script>
     // =========================================================
     // A. CAPTCHA DOĞRULAMA
@@ -267,10 +280,9 @@
         document.getElementById("verifyState").style.display = "none";
         document.getElementById("successState").style.display = "flex";
         
-        // CAPTCHA'yı geçince ASIL PANELİ GÖSTER
         setTimeout(() => {
           document.getElementById("captchaOverlay").style.opacity = "0";
-          document.getElementById("scpPanel").style.display = "block"; // Gizli paneli aç
+          document.getElementById("scpPanel").style.display = "block"; 
           
           setTimeout(() => { 
             document.getElementById("captchaOverlay").style.display = "none"; 
@@ -297,6 +309,7 @@
     const $ = id => document.getElementById(id);
 
     const generateButton = $("generateButton");
+    const regenButton = $("regenButton"); // Yeni buton
     const verifyButton = $("verifyButton");
     const timer = $("timer");
     const timerLabel = $("timerLabel");
@@ -330,6 +343,15 @@
     function clearState(){
      state = null;
      try{localStorage.removeItem(STORAGE)}catch{}
+    }
+
+    // YENİ FONKSİYON: Eski key'i sil ve yeni üretime başla
+    function deleteAndRegenerate() {
+      if (confirm("Mevcut key'iniz silinecek ve yeni bir key oluşturma süreci başlayacak. Onaylıyor musunuz?")) {
+        clearState(); // Hafızadan sil
+        render(); // Arayüzü sıfırla
+        startGeneration(); // Yeni üretimi başlat
+      }
     }
 
     async function apiRequest(body){
@@ -373,6 +395,7 @@
      statusBox.textContent = "● KEY SÜRESİ DOLDU"; statusBox.style.color = "#f87171";
      timerLabel.textContent = "KEY GEÇERSİZ"; timer.textContent = "EXPIRED"; timer.style.color = "#f87171";
      keyArea.style.display = "none";
+     regenButton.style.display = "none"; // Süre dolunca gizle
      description.textContent = "Bu key'in 24 saatlik kullanım süresi sona erdi.";
      generateButton.disabled = false; generateButton.textContent = "YENİ KEY ÜRET";
      showNotice("Key'in süresi doldu. Yeni bir key oluşturabilirsin.");
@@ -383,7 +406,8 @@
      if(!state){
       statusBox.textContent = "● SİSTEM HAZIR"; statusBox.style.color = "#60a5fa";
       timerLabel.textContent = "BEKLEME SÜRESİ"; timer.textContent = "00:30"; timer.style.color = "#60a5fa";
-      keyArea.style.display = "none"; // Sadece key oluşunca açılır
+      keyArea.style.display = "none"; 
+      regenButton.style.display = "none"; // Key yoksa gizli
       description.textContent = "KEY ÜRET butonuna bas. Discord daveti açılacak. 30 saniye sonra anahtarın sunucuya kaydedilecek.";
       generateButton.disabled = false; generateButton.textContent = "KEY ÜRET";
       return;
@@ -394,6 +418,7 @@
       statusBox.textContent = "● DOĞRULAMA BEKLENİYOR"; statusBox.style.color = "#60a5fa";
       timerLabel.textContent = "KEY HAZIRLANIYOR"; timer.textContent = formatTime(remaining); timer.style.color = "#60a5fa";
       keyArea.style.display = "none";
+      regenButton.style.display = "none";
       description.textContent = "Geri sayım tamamlandığında sunucu key'i kaydedecek.";
       generateButton.disabled = true; generateButton.textContent = "KEY HAZIRLANIYOR...";
       return;
@@ -405,12 +430,13 @@
       statusBox.textContent = "● KEY AKTİF"; statusBox.style.color = "#34d399";
       timerLabel.textContent = "KALAN GEÇERLİLİK"; timer.textContent = formatTime(remaining); timer.style.color = "#34d399";
       
-      // KEY BAŞARIYLA OLUŞTUYSA GÖSTER
       keyArea.style.display = "block"; 
       keyText.textContent = state.key;
       expiry.textContent = "Sunucu bitiş tarihi: "+ new Date(state.expiresAt).toLocaleString("tr-TR");
       description.textContent = "Key'in sunucuda kayıtlı. Süresi dolana kadar kullanabilirsin.";
+      
       generateButton.disabled = true; generateButton.textContent = "AKTİF KEY MEVCUT";
+      regenButton.style.display = "block"; // Aktif key varsa silme butonunu göster
      }
     }
 
@@ -419,6 +445,7 @@
      if(state && state.phase==="active" && Date.parse(state.expiresAt)>Date.now()){ render(); return; }
 
      generateButton.disabled = true; generateButton.textContent = "BAŞLATILIYOR...";
+     regenButton.style.display = "none"; // Üretim başlarken gizle
      window.open(DISCORD_URL,"_blank","noopener,noreferrer");
 
      try{
@@ -489,7 +516,6 @@
      if(state && state.phase==="waiting"){
       if(state.readyAt<=Date.now()){ timer.textContent = "00:00"; completeGeneration(); }
       else{ render(); }
-      return;
      }
      if(state && state.phase==="active"){ render(); }
     }
