@@ -3,10 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#080b14">
-<title>SCP Key Generator - Güvenli Giriş</title>
+<title>SCP Key Generator</title>
 <style>
-  /* ================= GENEL TASARIM ================= */
   *{box-sizing:border-box;margin:0;padding:0}
   body{
     min-height:100vh;display:flex;align-items:center;justify-content:center;
@@ -14,23 +12,17 @@
     color:#fff;font-family:Arial,sans-serif; overflow: hidden;
   }
 
-  /* Arka plan paneli (Başlangıçta bulanık) */
+  /* Sadece CAPTCHA geçildiğinde görünecek olan asıl panel */
   #scpPanel {
-    filter: blur(8px);
-    pointer-events: none;
-    transition: filter 0.6s ease;
-  }
-  #scpPanel.unlocked {
-    filter: blur(0);
-    pointer-events: auto;
-  }
-
-  /* ================= SCP KEY SİSTEMİ TASARIMI ================= */
-  .container{
     width:100%;max-width:460px;padding:30px 24px;
     background:#101a2c;border:1px solid #29446c;border-radius:22px;
-    box-shadow:0 20px 70px #0009;text-align:center
+    box-shadow:0 20px 70px #0009;text-align:center;
+    display: none; /* Başlangıçta gizli */
+    animation: fadeIn 0.5s ease;
   }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
   .logo{
     width:65px;height:65px;margin:0 auto 17px;border-radius:18px;
     display:grid;place-items:center;font-size:29px;font-weight:bold;
@@ -66,6 +58,8 @@
     margin-top:11px;background:#26395f;color:#c7d2fe;
     border:1px solid #38527e
   }
+  
+  /* KEY ALANI (Sadece oluşturulan key burada görünür) */
   .key-area{
     display:none;margin-top:18px;padding:18px;
     background:#071d19;border:1px solid #187455;border-radius:13px
@@ -78,6 +72,7 @@
   }
   .copy{background:#34d399;color:#052e24;margin-top:12px}
   .expiry{font-size:11px;color:#94a3b8;line-height:1.7;margin-top:12px}
+  
   .notice{
     display:none;margin-top:14px;padding:12px;border-radius:9px;
     background:#391b25;border:1px solid #853747;color:#fda4af;
@@ -110,29 +105,26 @@
 
   /* ================= CAPTCHA KATMANI ================= */
   #captchaOverlay {
-    position: fixed; inset: 0; background: rgba(8, 11, 20, 0.85);
-    backdrop-filter: blur(10px); display: flex; justify-content: center; align-items: center;
+    position: fixed; inset: 0; background: rgba(8, 11, 20, 0.95);
+    display: flex; justify-content: center; align-items: center;
     z-index: 9999; transition: opacity 0.5s ease;
   }
-  
   .captcha-widget {
     width: 340px; background: #1f212a; border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px; padding: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.9);
-    box-sizing: border-box; text-align: center;
+    box-sizing: border-box;
   }
-
   .loading-state { display: flex; align-items: center; justify-content: center; gap: 12px; color: #9ca3af; font-size: 14px; padding: 8px 0; }
   .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.1); border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  
   .error-state { display: none; color: #ef4444; font-size: 13px; font-weight: 500; align-items: center; justify-content: center; gap: 8px; padding: 8px 0; }
   .verify-state { display: none; flex-direction: column; }
-  .verify-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); text-align: left;}
+  .verify-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); }
   .verify-header img { height: 18px; object-fit: contain; filter: brightness(0) invert(1); opacity: 0.9; }
   .verify-header span { font-size: 13px; color: #f3f4f6; font-weight: 500; }
-  .verify-question { font-size: 20px; font-weight: 700; color: #f3f4f6; background: rgba(0, 0, 0, 0.2); padding: 12px; border-radius: 8px; letter-spacing: 1px; margin-bottom: 12px; }
+  .verify-question { font-size: 20px; font-weight: 700; text-align: center; color: #f3f4f6; background: rgba(0, 0, 0, 0.2); padding: 12px; border-radius: 8px; letter-spacing: 1px; margin-bottom: 12px; }
   .verify-input-group { display: flex; flex-direction: column; gap: 8px; }
-  .verify-input-group input { width: 100%; padding: 10px 12px; background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; color: #f3f4f6; text-align: center; outline: none; font-size: 14px; }
+  .verify-input-group input { width: 100%; padding: 10px 12px; background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; color: #f3f4f6; text-align: center; outline: none; font-size: 14px; margin-bottom: 0; }
   .verify-input-group input:focus { border-color: #2563eb; }
   .verify-btn { width: 100%; padding: 10px; background: #2563eb; border: none; border-radius: 6px; color: #fff; font-weight: 600; font-size: 14px; cursor: pointer; }
   .success-state { display: none; color: #10b981; font-size: 14px; font-weight: 500; align-items: center; justify-content: center; gap: 8px; padding: 8px 0; }
@@ -140,20 +132,17 @@
 </head>
 <body>
 
-  <!-- ================= 1. CAPTCHA KATMANI (En Üstte) ================= -->
+  <!-- ================= 1. CAPTCHA KATMANI ================= -->
   <div id="captchaOverlay">
     <div class="captcha-widget" id="captchaWidget">
-      
       <div class="loading-state" id="loadingState">
         <div class="spinner"></div>
         <span>Güvenlik kontrolü...</span>
       </div>
-
       <div class="error-state" id="errorState">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
         <span id="errorMsg">Hata</span>
       </div>
-
       <div class="verify-state" id="verifyState">
         <div class="verify-header">
           <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Vestel_logo.svg/512px-Vestel_logo.svg.png" alt="Vestel" onerror="this.style.display='none'">
@@ -165,16 +154,14 @@
           <button class="verify-btn" onclick="checkAnswer()">Onayla</button>
         </div>
       </div>
-
       <div class="success-state" id="successState">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-        <span>Doğrulandı, Giriş Yapılıyor...</span>
+        <span>Doğrulandı, Yönlendiriliyor...</span>
       </div>
-
     </div>
   </div>
 
-  <!-- ================= 2. SCP KEY SİSTEMİ (Arkada) ================= -->
+  <!-- ================= 2. ASIL SİTE (Sadece Key Alanı) ================= -->
   <main class="container" id="scpPanel">
     <div class="logo">S</div>
     <h1>SCP KEY SYSTEM</h1>
@@ -198,6 +185,7 @@
       DISCORD SUNUCUSUNA GİT
     </a>
 
+    <!-- SADECE OLUŞTURULAN KEY'İN GÖRÜNECEĞİ ALAN -->
     <div class="key-area" id="keyArea">
       <div class="key-title">✓ KEY BAŞARIYLA OLUŞTURULDU</div>
       <div class="key-text" id="keyText"></div>
@@ -224,7 +212,7 @@
   <!-- ================= 3. MANTIK KODU ================= -->
   <script>
     // =========================================================
-    // A. CAPTCHA DOĞRULAMA MANTIĞI
+    // A. CAPTCHA DOĞRULAMA
     // =========================================================
     const GITHUB_KEY_JSON_URL = "https://raw.githubusercontent.com/scptr1155-gif/roblozx/main/keys.json";
     const MY_SITE_KEY = "site_01s1b7mpae"; 
@@ -279,12 +267,14 @@
         document.getElementById("verifyState").style.display = "none";
         document.getElementById("successState").style.display = "flex";
         
-        // CAPTCHA'yı geçince panelin kilidini aç
+        // CAPTCHA'yı geçince ASIL PANELİ GÖSTER
         setTimeout(() => {
           document.getElementById("captchaOverlay").style.opacity = "0";
-          document.getElementById("scpPanel").classList.add("unlocked"); // Bulanıklığı kaldır
+          document.getElementById("scpPanel").style.display = "block"; // Gizli paneli aç
           
-          setTimeout(() => { document.getElementById("captchaOverlay").style.display = "none"; }, 500);
+          setTimeout(() => { 
+            document.getElementById("captchaOverlay").style.display = "none"; 
+          }, 500);
         }, 1000);
 
       } else {
@@ -296,7 +286,7 @@
     }
 
     // =========================================================
-    // B. SCP KEY SİSTEMİ MANTIĞI (GÜVENLİ KOPYA)
+    // B. KEY SİSTEMİ MANTIĞI
     // =========================================================
     "use strict";
 
@@ -393,7 +383,7 @@
      if(!state){
       statusBox.textContent = "● SİSTEM HAZIR"; statusBox.style.color = "#60a5fa";
       timerLabel.textContent = "BEKLEME SÜRESİ"; timer.textContent = "00:30"; timer.style.color = "#60a5fa";
-      keyArea.style.display = "none";
+      keyArea.style.display = "none"; // Sadece key oluşunca açılır
       description.textContent = "KEY ÜRET butonuna bas. Discord daveti açılacak. 30 saniye sonra anahtarın sunucuya kaydedilecek.";
       generateButton.disabled = false; generateButton.textContent = "KEY ÜRET";
       return;
@@ -414,7 +404,10 @@
       if(!Number.isFinite(remaining) || remaining<=0){ showExpired(); return; }
       statusBox.textContent = "● KEY AKTİF"; statusBox.style.color = "#34d399";
       timerLabel.textContent = "KALAN GEÇERLİLİK"; timer.textContent = formatTime(remaining); timer.style.color = "#34d399";
-      keyArea.style.display = "block"; keyText.textContent = state.key;
+      
+      // KEY BAŞARIYLA OLUŞTUYSA GÖSTER
+      keyArea.style.display = "block"; 
+      keyText.textContent = state.key;
       expiry.textContent = "Sunucu bitiş tarihi: "+ new Date(state.expiresAt).toLocaleString("tr-TR");
       description.textContent = "Key'in sunucuda kayıtlı. Süresi dolana kadar kullanabilirsin.";
       generateButton.disabled = true; generateButton.textContent = "AKTİF KEY MEVCUT";
